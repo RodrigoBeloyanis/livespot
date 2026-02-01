@@ -111,6 +111,15 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("audit_redacted_json_max_bytes", cfg.AuditRedactedJSONMaxBytes); err != nil {
 		return err
 	}
+	if err := requirePositiveInt("ai_gate_timeout_ms", cfg.AIGateTimeoutMs); err != nil {
+		return err
+	}
+	if err := requireNonEmpty("ai_gate_model", cfg.AIGateModel); err != nil {
+		return err
+	}
+	if err := requireNonEmpty("openai_base_url", cfg.OpenAIBaseURL); err != nil {
+		return err
+	}
 	if err := requirePositiveInt("topn_size", cfg.TopNSize); err != nil {
 		return err
 	}
@@ -477,6 +486,13 @@ func requireDecimalNonPositive(field string, v string) error {
 	}
 	if val.Sign() > 0 {
 		return ValidationError{Field: field, Message: "must be <= 0"}
+	}
+	return nil
+}
+
+func requireNonEmpty(field string, v string) error {
+	if v == "" {
+		return ValidationError{Field: field, Message: "missing"}
 	}
 	return nil
 }

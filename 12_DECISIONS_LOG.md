@@ -112,6 +112,13 @@ IMPACT: internal\\engine\\risk\\engine.go, internal\\config\\config.go, 00_SOURC
 RISKS / MITIGATIONS: If percentage drawdown is required later, add a new field with a formal contract update and migration; keep USDT field for backward compatibility.
 
 DATE: 2026-02-01
+TOPIC: AI Gate defaults
+DECISION: Add ai_gate_timeout_ms=8000, ai_gate_model=gpt-4o-mini, and openai_base_url=https://api.openai.com/v1.
+MOTIVATION: AI Gate requires deterministic API timeouts/model selection and a single base URL for OpenAI calls.
+IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: If model or base URL changes, update config defaults and record the change here.
+
+DATE: 2026-02-01
 TOPIC: Soak mode and readiness report
 DECISION: Add offline soak mode with mocked exchange and a deterministic readiness report (config_validated, audit_writer_ok, soak_pass).
 MOTIVATION: Stage 20 requires a long soak that validates liveness/health signals without network calls and a deterministic readiness summary.

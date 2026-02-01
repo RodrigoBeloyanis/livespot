@@ -196,6 +196,12 @@ Verification source: internal\config\config.go (Config struct / defaults).
 - clock_drift_max_ms_paper: 2000 (2 seconds)
 - disk_health_sample_interval_ms: 5000 (5 seconds)
 - audit_redacted_json_max_bytes: 4096 (4 KB)
+- ai_gate_timeout_ms: 8000 (8 seconds)
+- ai_gate_model: gpt-4o-mini
+- openai_base_url: https://api.openai.com/v1
+- ai_gate_timeout_ms: 8000 (8 seconds)
+- ai_gate_model: gpt-4o-mini
+- openai_base_url: https://api.openai.com/v1
 - strategy_min_edge_bps: 15 (bps)
 - strategy_min_edge_bps_fallback: 20 (bps)
 - risk_per_trade_usdt: 100.00 (USDT; 2 dp)
