@@ -82,3 +82,17 @@ DECISION: Estimate edge_bps using atr14_5m_bps minus (spread_current_bps + maker
 MOTIVATION: Deep-scan weights included an edge component but no deterministic formula was specified for Stage 12.
 IMPACT: internal\\engine\\deepscan\\deepscan.go
 RISKS / MITIGATIONS: Replace with the Strategy edge_bps_expected when available and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Decision/order intent ID prefixes
+DECISION: Use decision_id prefix "dec_" and order_intent_id prefix "oi_" with SHA-256 hex of canonical payloads.
+MOTIVATION: Contract requires deterministic IDs but does not specify prefix format; this keeps IDs URL-safe and readable.
+IMPACT: internal\\engine\\executor\\intent_id.go, internal\\engine\\strategy\\strategy.go
+RISKS / MITIGATIONS: If a different prefix format is mandated later, update builders and record a migration plan.
+
+DATE: 2026-02-01
+TOPIC: Deterministic client_order_id derivation for TP/SL
+DECISION: Derive TP/SL client_order_id from order_intent_id with suffixes "_TP" and "_SL" before base32 hashing.
+MOTIVATION: Contract requires deterministic IDs for protection orders but does not specify a derivation for TP/SL.
+IMPACT: internal\\engine\\executor\\intent_id.go, internal\\engine\\strategy\\strategy.go
+RISKS / MITIGATIONS: If execution policy mandates a different derivation, update the derivation and record the change.

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io/fs"
+	"math/big"
 )
 
 type StatFunc func(string) (fs.FileInfo, error)
@@ -110,6 +111,18 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("audit_redacted_json_max_bytes", cfg.AuditRedactedJSONMaxBytes); err != nil {
 		return err
 	}
+	if err := requireDecimalString("risk_per_trade_usdt", cfg.RiskPerTradeUSDT); err != nil {
+		return err
+	}
+	if err := requireDecimalString("risk_per_trade_min_usdt", cfg.RiskPerTradeMinUSDT); err != nil {
+		return err
+	}
+	if err := requireDecimalString("risk_per_trade_max_usdt", cfg.RiskPerTradeMaxUSDT); err != nil {
+		return err
+	}
+	if err := requireDecimalMinMax("risk_per_trade_usdt", cfg.RiskPerTradeUSDT, cfg.RiskPerTradeMinUSDT, cfg.RiskPerTradeMaxUSDT); err != nil {
+		return err
+	}
 	if err := requirePositiveInt("topn_size", cfg.TopNSize); err != nil {
 		return err
 	}
@@ -176,6 +189,93 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requireWeightsSum("deep_weights_sum", []float64{cfg.DeepWeightEdge, cfg.DeepWeightRegime, cfg.DeepWeightMicrostructure, cfg.DeepWeightVolatility}); err != nil {
 		return err
 	}
+	if cfg.StrategyID == "" {
+		return ValidationError{Field: "strategy_id", Message: "missing"}
+	}
+	if cfg.StrategyVersion == "" {
+		return ValidationError{Field: "strategy_version", Message: "missing"}
+	}
+	if err := requireRangeInt("strategy_trend_threshold_x10000", cfg.StrategyTrendThresholdX10000, 0, 10000); err != nil {
+		return err
+	}
+	if err := requireRangeInt("strategy_range_threshold_x10000", cfg.StrategyRangeThresholdX10000, 0, 10000); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_min_edge_bps", cfg.StrategyMinEdgeBps); err != nil {
+		return err
+	}
+	if cfg.StrategyMinEdgeBpsFallback < cfg.StrategyMinEdgeBps {
+		return ValidationError{Field: "strategy_min_edge_bps_fallback", Message: "must be >= strategy_min_edge_bps"}
+	}
+	if err := requirePositiveInt("strategy_max_spread_entry_bps", cfg.StrategyMaxSpreadEntryBps); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_max_delta_spread_bps_10s", cfg.StrategyMaxDeltaSpreadBps10s); err != nil {
+		return err
+	}
+	if err := requireRangeInt("strategy_min_imbalance_buy_x10000", cfg.StrategyMinImbalanceBuyX10000, 0, 10000); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_pullback_min_bps_from_ema20_5m", cfg.StrategyPullbackMinBpsEMA20); err != nil {
+		return err
+	}
+	if cfg.StrategyPullbackMaxBpsEMA20 <= cfg.StrategyPullbackMinBpsEMA20 {
+		return ValidationError{Field: "strategy_pullback_max_bps_from_ema20_5m", Message: "must be > strategy_pullback_min_bps_from_ema20_5m"}
+	}
+	if err := requirePositiveInt("strategy_volume_ratio_window_5m", cfg.StrategyVolumeRatioWindow5m); err != nil {
+		return err
+	}
+	if cfg.StrategyVolumeRatioWindow5m < 2 {
+		return ValidationError{Field: "strategy_volume_ratio_window_5m", Message: "must be >= 2"}
+	}
+	if cfg.StrategyMinVolumeRatio5m <= 0 {
+		return ValidationError{Field: "strategy_min_volume_ratio_5m", Message: "must be > 0"}
+	}
+	if err := requireWeight("strategy_weight_trend", cfg.StrategyWeightTrend); err != nil {
+		return err
+	}
+	if err := requireWeight("strategy_weight_pullback", cfg.StrategyWeightPullback); err != nil {
+		return err
+	}
+	if err := requireWeight("strategy_weight_microstruct", cfg.StrategyWeightMicrostruct); err != nil {
+		return err
+	}
+	if err := requireWeight("strategy_weight_volume", cfg.StrategyWeightVolume); err != nil {
+		return err
+	}
+	if err := requireWeightsSum("strategy_weights_sum", []float64{cfg.StrategyWeightTrend, cfg.StrategyWeightPullback, cfg.StrategyWeightMicrostruct, cfg.StrategyWeightVolume}); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_entry_maker_ttl_seconds", cfg.StrategyEntryMakerTTLSeconds); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_entry_maker_reprice_max", cfg.StrategyEntryMakerRepriceMax); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_entry_fallback_max_spread_bps", cfg.StrategyEntryFallbackMaxSpreadBps); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("strategy_entry_max_slippage_bps", cfg.StrategyEntryMaxSlippageBps); err != nil {
+		return err
+	}
+	if cfg.StrategyEntryFallbackKind != "IOC_LIMIT" && cfg.StrategyEntryFallbackKind != "MARKET_IF_ALLOWED" {
+		return ValidationError{Field: "strategy_entry_fallback_kind", Message: "must be IOC_LIMIT or MARKET_IF_ALLOWED"}
+	}
+	if cfg.StrategyExitKATRTrend <= 0 || cfg.StrategyExitMATRTrend <= 0 || cfg.StrategyExitKATRRange <= 0 || cfg.StrategyExitMATRRange <= 0 {
+		return ValidationError{Field: "strategy_exit_atr", Message: "must be > 0"}
+	}
+	if cfg.StrategyExitTrailingEnableProfitBps < 0 {
+		return ValidationError{Field: "strategy_exit_trailing_enable_profit_bps", Message: "must be >= 0"}
+	}
+	if err := requireRangeInt("strategy_exit_trailing_trend_min_x10000", cfg.StrategyExitTrailingTrendMinX10000, 0, 10000); err != nil {
+		return err
+	}
+	if cfg.StrategyExitTrailingTATRTrend <= 0 || cfg.StrategyExitTrailingTATRRange <= 0 {
+		return ValidationError{Field: "strategy_exit_trailing_t_atr", Message: "must be > 0"}
+	}
+	if err := requirePositiveInt("strategy_exit_trailing_max_spread_bps", cfg.StrategyExitTrailingMaxSpreadBps); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -227,4 +327,48 @@ func requireWeightsSum(field string, values []float64) error {
 		return ValidationError{Field: field, Message: "must sum to 1.0"}
 	}
 	return nil
+}
+
+func requireRangeInt(field string, v int, min int, max int) error {
+	if v < min || v > max {
+		return ValidationError{Field: field, Message: "out of range"}
+	}
+	return nil
+}
+
+func requireDecimalString(field string, v string) error {
+	if v == "" {
+		return ValidationError{Field: field, Message: "missing"}
+	}
+	if _, ok := parseDecimal(v); !ok {
+		return ValidationError{Field: field, Message: "invalid decimal"}
+	}
+	return nil
+}
+
+func requireDecimalMinMax(field string, v string, min string, max string) error {
+	val, ok := parseDecimal(v)
+	if !ok {
+		return ValidationError{Field: field, Message: "invalid decimal"}
+	}
+	minVal, ok := parseDecimal(min)
+	if !ok {
+		return ValidationError{Field: field, Message: "invalid min"}
+	}
+	maxVal, ok := parseDecimal(max)
+	if !ok {
+		return ValidationError{Field: field, Message: "invalid max"}
+	}
+	if val.Cmp(minVal) < 0 || val.Cmp(maxVal) > 0 {
+		return ValidationError{Field: field, Message: "out of bounds"}
+	}
+	return nil
+}
+
+func parseDecimal(value string) (*big.Rat, bool) {
+	r := new(big.Rat)
+	if _, ok := r.SetString(value); !ok {
+		return nil, false
+	}
+	return r, true
 }
