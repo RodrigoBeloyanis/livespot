@@ -32,3 +32,17 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: Snapshot persistence table
+DECISION: Add snapshots table with snapshot_json storage keyed by snapshot_id.
+MOTIVATION: Stage 11 requires snapshot persistence for audit reconstruction; schema details were not specified.
+IMPACT: migrations/0002_snapshots.sql
+RISKS / MITIGATIONS: If query needs expand (cycle_id/run_id) or payload size becomes an issue, evolve schema with a new migration and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Snapshot timestamp bounds scope
+DECISION: Apply rest_stale_ms_pause/time_sync_recv_window_ms bounds to snapshot-level timestamps (metadata, market_24h, returns_series), not historical candle timestamps.
+MOTIVATION: Candle timestamps are intentionally historical and would always violate a 60s staleness window; the spec does not clarify scope.
+IMPACT: internal\engine\state\snapshot_validator.go
+RISKS / MITIGATIONS: If a stricter policy is required, update validator to include candles and adjust config; log the change here.
