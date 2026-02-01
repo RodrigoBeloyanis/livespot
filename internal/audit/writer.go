@@ -30,6 +30,7 @@ type WriterOptions struct {
 	DBPath   string
 	JSONLDir string
 	Now      func() time.Time
+	DB       *sql.DB
 }
 
 func NewWriter(cfg config.Config, opts WriterOptions) (*Writer, error) {
@@ -49,13 +50,18 @@ func NewWriter(cfg config.Config, opts WriterOptions) (*Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := sqlite.Open(opts.DBPath, cfg)
-	if err != nil {
-		_ = jsonl.Close()
-		return nil, err
+	db := opts.DB
+	if db == nil {
+		db, err = sqlite.Open(opts.DBPath, cfg)
+		if err != nil {
+			_ = jsonl.Close()
+			return nil, err
+		}
 	}
 	if err := sqlite.Migrate(db, opts.Now()); err != nil {
-		_ = db.Close()
+		if opts.DB == nil {
+			_ = db.Close()
+		}
 		_ = jsonl.Close()
 		return nil, err
 	}
@@ -91,6 +97,10 @@ func (w *Writer) Write(record Record) error {
 
 func (w *Writer) QueueStats() (int, int) {
 	return len(w.queue), w.queueCapacity
+}
+
+func (w *Writer) DB() *sql.DB {
+	return w.db
 }
 
 func (w *Writer) Close() error {

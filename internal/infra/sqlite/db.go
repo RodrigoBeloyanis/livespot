@@ -20,6 +20,8 @@ func Open(path string, cfg config.Config) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sqlite open: %w", err)
 	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	if err := applyPragmas(db, cfg); err != nil {
 		_ = db.Close()
 		return nil, err
