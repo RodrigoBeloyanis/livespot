@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/aigate"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/state"
 	"github.com/RodrigoBeloyanis/livespot/internal/infra/binance"
+	"github.com/RodrigoBeloyanis/livespot/internal/infra/openai"
 	"github.com/RodrigoBeloyanis/livespot/internal/infra/sqlite"
 	"github.com/RodrigoBeloyanis/livespot/internal/observability"
 	"github.com/RodrigoBeloyanis/livespot/internal/webui"
@@ -55,6 +56,30 @@ func main() {
 	if err := sqlite.Migrate(webDB, time.Now()); err != nil {
 		log.Fatalf("webui db migrate failed: %v", err)
 	}
+	log.Printf("startup check ok: sqlite migrate (%s)", audit.DefaultSQLitePath)
+
+	openaiClient, err := aigate.NewOpenAIClient(cfg)
+	if err != nil {
+		log.Fatalf("openai client init failed: %v", err)
+	}
+	openaiStart := time.Now()
+	_, _, err = openaiClient.ChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: cfg.AIGateModel,
+		Messages: []openai.Message{
+			{Role: "system", Content: "ping"},
+		},
+	})
+	if err != nil {
+		log.Fatalf("openai startup check failed: %v", err)
+	}
+	log.Printf("startup check ok: openai model=%s latency_ms=%d", cfg.AIGateModel, time.Since(openaiStart).Milliseconds())
+
+	restStart := time.Now()
+	if _, err := restClient.Time(context.Background()); err != nil {
+		log.Fatalf("binance rest startup check failed: %v", err)
+	}
+	log.Printf("startup check ok: binance rest latency_ms=%d", time.Since(restStart).Milliseconds())
+
 	exchangeInfo, err := restClient.ExchangeInfo(context.Background())
 	if err != nil {
 		log.Fatalf("exchangeInfo failed: %v", err)
@@ -79,10 +104,6 @@ func main() {
 	}()
 
 	provider := state.NewLiveSnapshotProvider(cfg, restClient, store, filters)
-	openaiClient, err := aigate.NewOpenAIClient(cfg)
-	if err != nil {
-		log.Fatalf("openai client init failed: %v", err)
-	}
 	recorder := aigate.NewRecorder(cfg, webDB, writer, time.Now)
 	gate, err := aigate.NewGate(cfg, openaiClient, recorder, time.Now)
 	if err != nil {
@@ -99,6 +120,32 @@ func main() {
 	if len(symbols) > 0 {
 		app.StartWSFeed(ctx, loop, wsClient, symbols, store)
 	}
+	wsProbeCtx, wsCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	wsEvent, wsLatency, err := wsClient.ProbeBookTicker(wsProbeCtx, "BTCUSDT")
+	wsCancel()
+	if err != nil {
+		log.Fatalf("binance ws startup check failed: %v", err)
+	}
+	log.Printf("startup check ok: binance ws symbol=%s latency_ms=%d", wsEvent.Symbol, wsLatency)
+
+	accountResp, err := restClient.Account(context.Background())
+	if err != nil {
+		log.Fatalf("binance account startup check failed: %v", err)
+	}
+	accountInfo, err := binance.ParseAccountInfo(accountResp.Body)
+	if err != nil {
+		log.Fatalf("binance account decode failed: %v", err)
+	}
+	if balance, ok := binance.FindBalance(accountInfo, "USDT"); ok {
+		log.Printf("startup check ok: balance usdt free=%s locked=%s", balance.Free, balance.Locked)
+	} else {
+		log.Printf("startup check ok: balance usdt free=0.00000000 locked=0.00000000")
+	}
+
+	now := time.Now()
+	loop.UpdateRESTLastSuccess(now)
+	loop.UpdateWSLastMsg(now)
+
 	if *dryRun {
 		if err := loop.RunDryRun(); err != nil {
 			log.Fatalf("dry run failed: %v", err)

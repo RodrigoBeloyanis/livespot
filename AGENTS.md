@@ -209,6 +209,11 @@ Stage 08 - Decision + AI gate (no orders)
 - Persist snapshots and decisions (canonical JSON) without executing orders.
 - Reduce console noise with throttled summaries.
 
+Stage 09 - Startup checks visibility
+- Log startup checks for sqlite migrate, OpenAI connectivity, Binance REST/WS, and USDT balance.
+- Seed initial REST/WS liveness timestamps to prevent immediate stale pauses.
+
+
 ---
 
 ## 6) Required checklists (print every stage)
@@ -227,6 +232,7 @@ Stage 08 - Decision + AI gate (no orders)
 - [ ] Validations re-run after last code change and PASS
 - [ ] Push will be executed exactly once
 
+
 ### 6.3 Post-push checklist
 - [ ] Push output shown and indicates success
 - [ ] Stage completion marker printed: `STAGE XX COMPLETE`
@@ -238,6 +244,7 @@ Stage 08 - Decision + AI gate (no orders)
 - [ ] Strategy decision and AI gate evaluation complete (no order placement)
 - [ ] Decisions persisted to SQLite with canonical JSON payload
 - [ ] Summary logging throttled (no per-tick WS spam)
+
 
 ---
 
@@ -255,5 +262,9 @@ If blocked:
 - Output `MISSING_INFORMATION (BLOCKER)` and STOP.
 
 ---
+
+
+
+
 
 

@@ -59,6 +59,46 @@ func NewWSClient(opts WSOptions) *WSClient {
 	}
 }
 
+func (c *WSClient) ProbeBookTicker(ctx context.Context, symbol string) (BookTickerEvent, int, error) {
+	name := strings.TrimSpace(symbol)
+	if name == "" {
+		return BookTickerEvent{}, 0, fmt.Errorf("ws symbol missing")
+	}
+	u, err := url.Parse(c.baseURL)
+	if err != nil {
+		return BookTickerEvent{}, 0, fmt.Errorf("ws base url: %w", err)
+	}
+	u.Path = "/stream"
+	q := u.Query()
+	q.Set("streams", strings.ToLower(name)+"@bookTicker")
+	u.RawQuery = q.Encode()
+
+	start := c.now()
+	conn, _, err := c.dialer.DialContext(ctx, u.String(), nil)
+	if err != nil {
+		return BookTickerEvent{}, 0, err
+	}
+	defer conn.Close()
+
+	_, payload, err := conn.ReadMessage()
+	if err != nil {
+		return BookTickerEvent{}, 0, err
+	}
+	var env streamEnvelope
+	if err := json.Unmarshal(payload, &env); err != nil {
+		return BookTickerEvent{}, 0, err
+	}
+	var event BookTickerEvent
+	if err := json.Unmarshal(env.Data, &event); err != nil {
+		return BookTickerEvent{}, 0, err
+	}
+	if event.EventTime <= 0 {
+		event.EventTime = c.now().UnixMilli()
+	}
+	latency := int(c.now().Sub(start).Milliseconds())
+	return event, latency, nil
+}
+
 func (c *WSClient) Run(ctx context.Context, symbols []string, onEvent func(BookTickerEvent)) error {
 	if len(symbols) == 0 {
 		return fmt.Errorf("ws symbols missing")
