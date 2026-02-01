@@ -18,3 +18,10 @@ MOTIVATION: Align module path with the configured Git remote to avoid local-only
 IMPACT: go.mod
 RISKS / MITIGATIONS: If the repository origin changes, update go.mod and record the change here.
 
+DATE: 2026-02-01
+TOPIC: Config defaults and validation baseline
+DECISION: Implement config defaults per 00_SOURCE_OF_TRUTH and add audit_redacted_json_max_bytes=4096; set live_require_ok_file=false with live_ok_file_path=var/LIVE.ok.
+MOTIVATION: Stage 02 requires strict config validation and 07_SECURITY mandates a fixed audit_redacted_json_max_bytes default.
+IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: If the redacted JSON limit is too small or the LIVE.ok policy changes, adjust defaults and revalidate with a logged decision.
+

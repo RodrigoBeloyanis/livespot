@@ -194,6 +194,7 @@ Verification source: internal\config\config.go (Config struct / defaults).
 - clock_drift_max_ms_live: 500 (0.5 seconds)
 - clock_drift_max_ms_paper: 2000 (2 seconds)
 - disk_health_sample_interval_ms: 5000 (5 seconds)
+- audit_redacted_json_max_bytes: 4096 (4 KB)
 
 Rule: If any of these fields is missing at boot, the system must enter PAUSE with reason_code STRAT_CONFIG_INVALID.
 
