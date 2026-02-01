@@ -32,6 +32,8 @@ type Config struct {
 	ClockDriftMaxMsPaper          int
 	DiskHealthSampleIntervalMs    int
 	AuditRedactedJSONMaxBytes     int
+	IntentRestQueryTimeoutMs      int
+	IntentMaxRestQueries          int
 }
 
 func Default() Config {
@@ -63,6 +65,8 @@ func Default() Config {
 		ClockDriftMaxMsPaper:          2000,
 		DiskHealthSampleIntervalMs:    5000,
 		AuditRedactedJSONMaxBytes:     4096,
+		IntentRestQueryTimeoutMs:      5000,
+		IntentMaxRestQueries:          3,
 	}
 }
 

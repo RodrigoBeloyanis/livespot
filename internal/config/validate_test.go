@@ -37,6 +37,19 @@ func TestValidateInvalidQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestValidateIntentDefaults(t *testing.T) {
+	cfg := Default()
+	cfg.IntentRestQueryTimeoutMs = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for intent_rest_query_timeout_ms")
+	}
+	cfg = Default()
+	cfg.IntentMaxRestQueries = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for intent_max_rest_queries")
+	}
+}
+
 func TestValidateLiveOKFileMissing(t *testing.T) {
 	cfg := Default()
 	cfg.LiveRequireOKFile = true

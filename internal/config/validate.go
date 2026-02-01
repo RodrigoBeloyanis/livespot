@@ -110,6 +110,12 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("audit_redacted_json_max_bytes", cfg.AuditRedactedJSONMaxBytes); err != nil {
 		return err
 	}
+	if err := requirePositiveInt("intent_rest_query_timeout_ms", cfg.IntentRestQueryTimeoutMs); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("intent_max_rest_queries", cfg.IntentMaxRestQueries); err != nil {
+		return err
+	}
 	return nil
 }
 
