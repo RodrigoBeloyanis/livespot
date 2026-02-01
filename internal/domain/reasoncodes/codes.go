@@ -1,0 +1,241 @@
+package reasoncodes
+
+type ReasonCode string
+
+const (
+	OK ReasonCode = "OK"
+
+	ALERT_RAISED                  ReasonCode = "ALERT_RAISED"
+	CLOSE_SAFELY_DUST             ReasonCode = "CLOSE_SAFELY_DUST"
+	CLOSE_SAFELY_FAILED           ReasonCode = "CLOSE_SAFELY_FAILED"
+	DB_WRITER_BACKPRESSURE        ReasonCode = "DB_WRITER_BACKPRESSURE"
+	DB_WRITER_QUEUE_HIGH          ReasonCode = "DB_WRITER_QUEUE_HIGH"
+	DB_WRITER_QUEUE_FULL          ReasonCode = "DB_WRITER_QUEUE_FULL"
+	DISK_LOW_DEGRADE              ReasonCode = "DISK_LOW_DEGRADE"
+	DISK_LOW_PAUSE                ReasonCode = "DISK_LOW_PAUSE"
+	DRIFT_LIMIT_EXCEEDED          ReasonCode = "DRIFT_LIMIT_EXCEEDED"
+	ENTER_DEGRADE                 ReasonCode = "ENTER_DEGRADE"
+	ENTER_EXIT                    ReasonCode = "ENTER_EXIT"
+	ENTER_PAUSE                   ReasonCode = "ENTER_PAUSE"
+	LOOP_STUCK_DEGRADE            ReasonCode = "LOOP_STUCK_DEGRADE"
+	LOOP_STUCK_PAUSE              ReasonCode = "LOOP_STUCK_PAUSE"
+	PAUSE_NEEDS_MANUAL_PROTECTION ReasonCode = "PAUSE_NEEDS_MANUAL_PROTECTION"
+	PAUSE_NEEDS_MANUAL            ReasonCode = "PAUSE_NEEDS_MANUAL"
+	REST_STALE_DEGRADE            ReasonCode = "REST_STALE_DEGRADE"
+	REST_STALE_PAUSE              ReasonCode = "REST_STALE_PAUSE"
+	WS_STALE_DEGRADE              ReasonCode = "WS_STALE_DEGRADE"
+	WS_STALE_PAUSE                ReasonCode = "WS_STALE_PAUSE"
+
+	AIGATE_MODIFY_INVALID ReasonCode = "AIGATE_MODIFY_INVALID"
+	AIGATE_PARSE_FAIL     ReasonCode = "AIGATE_PARSE_FAIL"
+	AIGATE_REASON_UNKNOWN ReasonCode = "AIGATE_REASON_UNKNOWN"
+	AIGATE_SCHEMA_INVALID ReasonCode = "AIGATE_SCHEMA_INVALID"
+	AIGATE_TIMEOUT        ReasonCode = "AIGATE_TIMEOUT"
+
+	BINANCE_TIMESTAMP_REJECTED      ReasonCode = "BINANCE_TIMESTAMP_REJECTED"
+	CLIENT_ORDER_ID_INVALID         ReasonCode = "CLIENT_ORDER_ID_INVALID"
+	CLIENT_ORDER_ID_REUSE_BLOCK     ReasonCode = "CLIENT_ORDER_ID_REUSE_BLOCK"
+	FILTERS_DRIFT_DETECTED          ReasonCode = "FILTERS_DRIFT_DETECTED"
+	FILTERS_REFRESHED               ReasonCode = "FILTERS_REFRESHED"
+	INTENT_CONFIRMED_BY_REST        ReasonCode = "INTENT_CONFIRMED_BY_REST"
+	INTENT_NOT_FOUND_BY_REST        ReasonCode = "INTENT_NOT_FOUND_BY_REST"
+	INTENT_SENT_UNKNOWN             ReasonCode = "INTENT_SENT_UNKNOWN"
+	ORDER_CANCEL_REJECTED           ReasonCode = "ORDER_CANCEL_REJECTED"
+	ORDER_SUBMIT_REJECTED           ReasonCode = "ORDER_SUBMIT_REJECTED"
+	ORDER_SUBMIT_TIMEOUT            ReasonCode = "ORDER_SUBMIT_TIMEOUT"
+	PROTECTION_INSTALL_FAILED       ReasonCode = "PROTECTION_INSTALL_FAILED"
+	PROTECTION_INVALID_FILTER       ReasonCode = "PROTECTION_INVALID_FILTER"
+	PROTECTION_INVALID_MIN_NOTIONAL ReasonCode = "PROTECTION_INVALID_MIN_NOTIONAL"
+	RATE_LIMIT_418                  ReasonCode = "RATE_LIMIT_418"
+	RATE_LIMIT_429                  ReasonCode = "RATE_LIMIT_429"
+	RECONCILE_DIFF_DETECTED         ReasonCode = "RECONCILE_DIFF_DETECTED"
+	RETRY_AFTER_APPLIED             ReasonCode = "RETRY_AFTER_APPLIED"
+
+	CLOCK_DRIFT_WARN     ReasonCode = "CLOCK_DRIFT_WARN"
+	IMBALANCE_AGAINST    ReasonCode = "IMBALANCE_AGAINST"
+	MICROVOL_SPIKE       ReasonCode = "MICROVOL_SPIKE"
+	REGIME_MISMATCH      ReasonCode = "REGIME_MISMATCH"
+	REGIME_NO_TRADE      ReasonCode = "REGIME_NO_TRADE"
+	REGIME_WEAK          ReasonCode = "REGIME_WEAK"
+	SPREAD_BAD_VS_NORMAL ReasonCode = "SPREAD_BAD_VS_NORMAL"
+	SPREAD_OPENING       ReasonCode = "SPREAD_OPENING"
+	SYMBOL_QUARANTINED   ReasonCode = "SYMBOL_QUARANTINED"
+	TIME_SYNC_FAIL       ReasonCode = "TIME_SYNC_FAIL"
+	WS_OOO_EVENT         ReasonCode = "WS_OOO_EVENT"
+
+	RISK_CANCEL_REPLACE_LIMIT_HIT  ReasonCode = "RISK_CANCEL_REPLACE_LIMIT_HIT"
+	RISK_CHURN_LIMIT_HIT           ReasonCode = "RISK_CHURN_LIMIT_HIT"
+	RISK_COOLDOWN_ACTIVE           ReasonCode = "RISK_COOLDOWN_ACTIVE"
+	RISK_CORRELATION_TOO_HIGH      ReasonCode = "RISK_CORRELATION_TOO_HIGH"
+	RISK_DAILY_LOSS_LIMIT          ReasonCode = "RISK_DAILY_LOSS_LIMIT"
+	RISK_DIVERSIFY_APPLIED         ReasonCode = "RISK_DIVERSIFY_APPLIED"
+	RISK_DRAWDOWN_LIMIT            ReasonCode = "RISK_DRAWDOWN_LIMIT"
+	RISK_ENTRY_ALREADY_PENDING     ReasonCode = "RISK_ENTRY_ALREADY_PENDING"
+	RISK_EXPOSURE_LIMIT            ReasonCode = "RISK_EXPOSURE_LIMIT"
+	RISK_INSUFFICIENT_FREE_BALANCE ReasonCode = "RISK_INSUFFICIENT_FREE_BALANCE"
+	RISK_MAX_OPEN_ORDERS           ReasonCode = "RISK_MAX_OPEN_ORDERS"
+	RISK_MAX_TRADES_DAY            ReasonCode = "RISK_MAX_TRADES_DAY"
+	RISK_MAX_TRADES_WINDOW         ReasonCode = "RISK_MAX_TRADES_WINDOW"
+	RISK_POSITION_ALREADY_OPEN     ReasonCode = "RISK_POSITION_ALREADY_OPEN"
+	RISK_SIZE_INVALID              ReasonCode = "RISK_SIZE_INVALID"
+	RISK_SYMBOL_LOSS_STREAK        ReasonCode = "RISK_SYMBOL_LOSS_STREAK"
+	RISK_UNFILLED_ORDER_COUNT_RISK ReasonCode = "RISK_UNFILLED_ORDER_COUNT_RISK"
+
+	STRAT_CONFIG_INVALID              ReasonCode = "STRAT_CONFIG_INVALID"
+	STRAT_EDGE_BELOW_MIN              ReasonCode = "STRAT_EDGE_BELOW_MIN"
+	STRAT_EDGE_OK                     ReasonCode = "STRAT_EDGE_OK"
+	STRAT_ENTRY_ABORTED_COST          ReasonCode = "STRAT_ENTRY_ABORTED_COST"
+	STRAT_ENTRY_MAKER_TTL             ReasonCode = "STRAT_ENTRY_MAKER_TTL"
+	STRAT_ENTRY_TIMEOUT               ReasonCode = "STRAT_ENTRY_TIMEOUT"
+	STRAT_EXIT_ATR_TP_SL              ReasonCode = "STRAT_EXIT_ATR_TP_SL"
+	STRAT_EXIT_INVALID                ReasonCode = "STRAT_EXIT_INVALID"
+	STRAT_FALLBACK_ALLOWED            ReasonCode = "STRAT_FALLBACK_ALLOWED"
+	STRAT_FALLBACK_BLOCKED            ReasonCode = "STRAT_FALLBACK_BLOCKED"
+	STRAT_FALLBACK_IOC                ReasonCode = "STRAT_FALLBACK_IOC"
+	STRAT_FALLBACK_MARKET             ReasonCode = "STRAT_FALLBACK_MARKET"
+	STRAT_IMBALANCE_AGAINST           ReasonCode = "STRAT_IMBALANCE_AGAINST"
+	STRAT_IMBALANCE_OK                ReasonCode = "STRAT_IMBALANCE_OK"
+	STRAT_INPUT_INVALID               ReasonCode = "STRAT_INPUT_INVALID"
+	STRAT_MAKER_REJECTED_CROSSES_BOOK ReasonCode = "STRAT_MAKER_REJECTED_CROSSES_BOOK"
+	STRAT_MAKER_REPRICE               ReasonCode = "STRAT_MAKER_REPRICE"
+	STRAT_MICROSTRUCT_OK              ReasonCode = "STRAT_MICROSTRUCT_OK"
+	STRAT_MISSING_FIELD               ReasonCode = "STRAT_MISSING_FIELD"
+	STRAT_OK                          ReasonCode = "STRAT_OK"
+	STRAT_PULLBACK_FAIL               ReasonCode = "STRAT_PULLBACK_FAIL"
+	STRAT_PULLBACK_OK                 ReasonCode = "STRAT_PULLBACK_OK"
+	STRAT_REGIME_RANGE_OK             ReasonCode = "STRAT_REGIME_RANGE_OK"
+	STRAT_REGIME_TREND_OK             ReasonCode = "STRAT_REGIME_TREND_OK"
+	STRAT_REGIME_WEAK                 ReasonCode = "STRAT_REGIME_WEAK"
+	STRAT_SPREAD_OPENING              ReasonCode = "STRAT_SPREAD_OPENING"
+	STRAT_SPREAD_TOO_WIDE             ReasonCode = "STRAT_SPREAD_TOO_WIDE"
+	STRAT_TRAILING_ARM_ALLOWED        ReasonCode = "STRAT_TRAILING_ARM_ALLOWED"
+	STRAT_TRAILING_ARM_BLOCKED        ReasonCode = "STRAT_TRAILING_ARM_BLOCKED"
+	STRAT_VOLUME_LOW                  ReasonCode = "STRAT_VOLUME_LOW"
+	STRAT_VOLUME_OK                   ReasonCode = "STRAT_VOLUME_OK"
+)
+
+var allCodes = map[ReasonCode]struct{}{
+	OK: {},
+
+	ALERT_RAISED:                  {},
+	CLOSE_SAFELY_DUST:             {},
+	CLOSE_SAFELY_FAILED:           {},
+	DB_WRITER_BACKPRESSURE:        {},
+	DB_WRITER_QUEUE_HIGH:          {},
+	DB_WRITER_QUEUE_FULL:          {},
+	DISK_LOW_DEGRADE:              {},
+	DISK_LOW_PAUSE:                {},
+	DRIFT_LIMIT_EXCEEDED:          {},
+	ENTER_DEGRADE:                 {},
+	ENTER_EXIT:                    {},
+	ENTER_PAUSE:                   {},
+	LOOP_STUCK_DEGRADE:            {},
+	LOOP_STUCK_PAUSE:              {},
+	PAUSE_NEEDS_MANUAL_PROTECTION: {},
+	PAUSE_NEEDS_MANUAL:            {},
+	REST_STALE_DEGRADE:            {},
+	REST_STALE_PAUSE:              {},
+	WS_STALE_DEGRADE:              {},
+	WS_STALE_PAUSE:                {},
+
+	AIGATE_MODIFY_INVALID: {},
+	AIGATE_PARSE_FAIL:     {},
+	AIGATE_REASON_UNKNOWN: {},
+	AIGATE_SCHEMA_INVALID: {},
+	AIGATE_TIMEOUT:        {},
+
+	BINANCE_TIMESTAMP_REJECTED:      {},
+	CLIENT_ORDER_ID_INVALID:         {},
+	CLIENT_ORDER_ID_REUSE_BLOCK:     {},
+	FILTERS_DRIFT_DETECTED:          {},
+	FILTERS_REFRESHED:               {},
+	INTENT_CONFIRMED_BY_REST:        {},
+	INTENT_NOT_FOUND_BY_REST:        {},
+	INTENT_SENT_UNKNOWN:             {},
+	ORDER_CANCEL_REJECTED:           {},
+	ORDER_SUBMIT_REJECTED:           {},
+	ORDER_SUBMIT_TIMEOUT:            {},
+	PROTECTION_INSTALL_FAILED:       {},
+	PROTECTION_INVALID_FILTER:       {},
+	PROTECTION_INVALID_MIN_NOTIONAL: {},
+	RATE_LIMIT_418:                  {},
+	RATE_LIMIT_429:                  {},
+	RECONCILE_DIFF_DETECTED:         {},
+	RETRY_AFTER_APPLIED:             {},
+
+	CLOCK_DRIFT_WARN:     {},
+	IMBALANCE_AGAINST:    {},
+	MICROVOL_SPIKE:       {},
+	REGIME_MISMATCH:      {},
+	REGIME_NO_TRADE:      {},
+	REGIME_WEAK:          {},
+	SPREAD_BAD_VS_NORMAL: {},
+	SPREAD_OPENING:       {},
+	SYMBOL_QUARANTINED:   {},
+	TIME_SYNC_FAIL:       {},
+	WS_OOO_EVENT:         {},
+
+	RISK_CANCEL_REPLACE_LIMIT_HIT:  {},
+	RISK_CHURN_LIMIT_HIT:           {},
+	RISK_COOLDOWN_ACTIVE:           {},
+	RISK_CORRELATION_TOO_HIGH:      {},
+	RISK_DAILY_LOSS_LIMIT:          {},
+	RISK_DIVERSIFY_APPLIED:         {},
+	RISK_DRAWDOWN_LIMIT:            {},
+	RISK_ENTRY_ALREADY_PENDING:     {},
+	RISK_EXPOSURE_LIMIT:            {},
+	RISK_INSUFFICIENT_FREE_BALANCE: {},
+	RISK_MAX_OPEN_ORDERS:           {},
+	RISK_MAX_TRADES_DAY:            {},
+	RISK_MAX_TRADES_WINDOW:         {},
+	RISK_POSITION_ALREADY_OPEN:     {},
+	RISK_SIZE_INVALID:              {},
+	RISK_SYMBOL_LOSS_STREAK:        {},
+	RISK_UNFILLED_ORDER_COUNT_RISK: {},
+
+	STRAT_CONFIG_INVALID:              {},
+	STRAT_EDGE_BELOW_MIN:              {},
+	STRAT_EDGE_OK:                     {},
+	STRAT_ENTRY_ABORTED_COST:          {},
+	STRAT_ENTRY_MAKER_TTL:             {},
+	STRAT_ENTRY_TIMEOUT:               {},
+	STRAT_EXIT_ATR_TP_SL:              {},
+	STRAT_EXIT_INVALID:                {},
+	STRAT_FALLBACK_ALLOWED:            {},
+	STRAT_FALLBACK_BLOCKED:            {},
+	STRAT_FALLBACK_IOC:                {},
+	STRAT_FALLBACK_MARKET:             {},
+	STRAT_IMBALANCE_AGAINST:           {},
+	STRAT_IMBALANCE_OK:                {},
+	STRAT_INPUT_INVALID:               {},
+	STRAT_MAKER_REJECTED_CROSSES_BOOK: {},
+	STRAT_MAKER_REPRICE:               {},
+	STRAT_MICROSTRUCT_OK:              {},
+	STRAT_MISSING_FIELD:               {},
+	STRAT_OK:                          {},
+	STRAT_PULLBACK_FAIL:               {},
+	STRAT_PULLBACK_OK:                 {},
+	STRAT_REGIME_RANGE_OK:             {},
+	STRAT_REGIME_TREND_OK:             {},
+	STRAT_REGIME_WEAK:                 {},
+	STRAT_SPREAD_OPENING:              {},
+	STRAT_SPREAD_TOO_WIDE:             {},
+	STRAT_TRAILING_ARM_ALLOWED:        {},
+	STRAT_TRAILING_ARM_BLOCKED:        {},
+	STRAT_VOLUME_LOW:                  {},
+	STRAT_VOLUME_OK:                   {},
+}
+
+func IsValid(code ReasonCode) bool {
+	_, ok := allCodes[code]
+	return ok
+}
+
+func ValidateList(codes []ReasonCode) bool {
+	for _, code := range codes {
+		if !IsValid(code) {
+			return false
+		}
+	}
+	return true
+}
