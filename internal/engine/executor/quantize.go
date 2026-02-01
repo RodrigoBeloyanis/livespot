@@ -3,223 +3,122 @@ package executor
 import (
 	"fmt"
 	"math/big"
-	"strings"
 
-	"github.com/RodrigoBeloyanis/livespot/internal/domain/contracts"
+	"github.com/RodrigoBeloyanis/livespot/internal/domain/reasoncodes"
 )
 
-func QuantizePrice(desired string, tickSize string) (string, error) {
-	return quantizeToStep(desired, tickSize)
-}
+func QuantizeOrder(req OrderRequest, filters SymbolFilters) (OrderRequest, reasoncodes.ReasonCode, error) {
+	out := req
+	if filters.LotSize == nil && filters.MarketLotSize == nil {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("lot size missing")
+	}
+	if req.Type != OrderTypeMarket && filters.Price == nil {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("price filter missing")
+	}
+	if req.Type == OrderTypeMarket && req.Price == "" {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("market price missing")
+	}
 
-func QuantizeQty(desired string, stepSize string, minQty string, maxQty string, minNotional string, maxNotional string, price string) (string, error) {
-	qty, err := quantizeToStep(desired, stepSize)
-	if err != nil {
-		return "", err
-	}
-	if err := ensureDecimalRange(qty, minQty, maxQty); err != nil {
-		return "", err
-	}
-	if minNotional != "" {
-		ok, err := notionalAtLeast(qty, price, minNotional)
+	pricePrecision := 0
+	if filters.Price != nil {
+		pricePrecision = decimalPlaces(filters.Price.TickSize)
+		priceRat, err := parseDecimalStrict(req.Price)
 		if err != nil {
-			return "", err
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
 		}
-		if !ok {
-			return "", fmt.Errorf("quantized notional below minimum")
-		}
-	}
-	if maxNotional != "" {
-		ok, err := notionalAtMost(qty, price, maxNotional)
+		tick, err := parseDecimalStrict(filters.Price.TickSize)
 		if err != nil {
-			return "", err
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
 		}
-		if !ok {
-			return "", fmt.Errorf("quantized notional above maximum")
-		}
-	}
-	return qty, nil
-}
-
-func QuantizeEntry(desiredPrice string, desiredQty string, constraints contracts.DecisionConstraints) (string, string, error) {
-	price, err := QuantizePrice(desiredPrice, constraints.TickSize)
-	if err != nil {
-		return "", "", err
-	}
-	qty, err := QuantizeQty(desiredQty, constraints.StepSize, constraints.MinQty, constraints.MaxQty, constraints.MinNotional, constraints.MaxNotional, price)
-	if err != nil {
-		return "", "", err
-	}
-	return price, qty, nil
-}
-
-func quantizeToStep(value string, step string) (string, error) {
-	scale, err := decimalScale(step)
-	if err != nil {
-		return "", err
-	}
-	stepInt, err := decimalToScaledInt(step, scale)
-	if err != nil {
-		return "", err
-	}
-	if stepInt.Sign() <= 0 {
-		return "", fmt.Errorf("step size invalid")
-	}
-	valueInt, err := decimalToScaledIntFloor(value, scale)
-	if err != nil {
-		return "", err
-	}
-	quotient := new(big.Int).Div(valueInt, stepInt)
-	quantized := new(big.Int).Mul(quotient, stepInt)
-	return formatScaledInt(quantized, scale), nil
-}
-
-func ensureDecimalRange(value string, min string, max string) error {
-	if min != "" {
-		cmp, err := compareDecimal(value, min)
+		quantizedPrice, err := quantizeDown(priceRat, tick)
 		if err != nil {
-			return err
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
 		}
-		if cmp < 0 {
-			return fmt.Errorf("value below min")
+		if filters.Price.MinPrice != "" {
+			minPrice, err := parseDecimalStrict(filters.Price.MinPrice)
+			if err != nil {
+				return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+			}
+			if quantizedPrice.Cmp(minPrice) < 0 {
+				return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("price below min")
+			}
 		}
+		if filters.Price.MaxPrice != "" {
+			maxPrice, err := parseDecimalStrict(filters.Price.MaxPrice)
+			if err != nil {
+				return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+			}
+			if quantizedPrice.Cmp(maxPrice) > 0 {
+				return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("price above max")
+			}
+		}
+		out.Price = ratToString(quantizedPrice, pricePrecision)
 	}
-	if max != "" {
-		cmp, err := compareDecimal(value, max)
+
+	lot := filters.LotSize
+	if req.Type == OrderTypeMarket && filters.MarketLotSize != nil {
+		lot = filters.MarketLotSize
+	}
+	qtyPrecision := decimalPlaces(lot.StepSize)
+	qtyRat, err := parseDecimalStrict(req.Qty)
+	if err != nil {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+	}
+	step, err := parseDecimalStrict(lot.StepSize)
+	if err != nil {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+	}
+	quantizedQty, err := quantizeDown(qtyRat, step)
+	if err != nil {
+		return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+	}
+	if lot.MinQty != "" {
+		minQty, err := parseDecimalStrict(lot.MinQty)
 		if err != nil {
-			return err
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
 		}
-		if cmp > 0 {
-			return fmt.Errorf("value above max")
+		if quantizedQty.Cmp(minQty) < 0 {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("qty below min")
 		}
 	}
-	return nil
-}
+	if lot.MaxQty != "" {
+		maxQty, err := parseDecimalStrict(lot.MaxQty)
+		if err != nil {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+		}
+		if quantizedQty.Cmp(maxQty) > 0 {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("qty above max")
+		}
+	}
+	out.Qty = ratToString(quantizedQty, qtyPrecision)
 
-func notionalAtLeast(qty string, price string, minNotional string) (bool, error) {
-	n, err := multiplyDecimal(qty, price)
-	if err != nil {
-		return false, err
+	if filters.MinNotional != nil && filters.MinNotional.MinNotional != "" {
+		minNotional, err := parseDecimalStrict(filters.MinNotional.MinNotional)
+		if err != nil {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+		}
+		priceRat, err := parseDecimalStrict(out.Price)
+		if err != nil {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, err
+		}
+		notional := new(big.Rat).Mul(priceRat, quantizedQty)
+		if notional.Cmp(minNotional) < 0 {
+			return out, reasoncodes.PROTECTION_INVALID_MIN_NOTIONAL, fmt.Errorf("notional below min")
+		}
 	}
-	cmp, err := compareDecimal(n, minNotional)
-	if err != nil {
-		return false, err
-	}
-	return cmp >= 0, nil
-}
 
-func notionalAtMost(qty string, price string, maxNotional string) (bool, error) {
-	n, err := multiplyDecimal(qty, price)
-	if err != nil {
-		return false, err
+	if req.TrailingDeltaBips > 0 {
+		if filters.TrailingDelta == nil {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("trailing delta missing")
+		}
+		td := filters.TrailingDelta
+		if req.TrailingDeltaBips < td.MinTrailingDeltaBips || req.TrailingDeltaBips > td.MaxTrailingDeltaBips {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("trailing delta out of bounds")
+		}
+		if !isStepAligned(req.TrailingDeltaBips, td.StepBips) {
+			return out, reasoncodes.PROTECTION_INVALID_FILTER, fmt.Errorf("trailing delta not aligned")
+		}
 	}
-	cmp, err := compareDecimal(n, maxNotional)
-	if err != nil {
-		return false, err
-	}
-	return cmp <= 0, nil
-}
 
-func decimalScale(value string) (int, error) {
-	parts := strings.Split(value, ".")
-	if len(parts) > 2 {
-		return 0, fmt.Errorf("invalid decimal")
-	}
-	if len(parts) == 1 {
-		return 0, nil
-	}
-	return len(parts[1]), nil
-}
-
-func decimalToScaledInt(value string, scale int) (*big.Int, error) {
-	parts := strings.Split(value, ".")
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	whole := parts[0]
-	frac := ""
-	if len(parts) == 2 {
-		frac = parts[1]
-	}
-	if len(frac) > scale {
-		return nil, fmt.Errorf("decimal scale exceeds step")
-	}
-	for len(frac) < scale {
-		frac += "0"
-	}
-	raw := whole + frac
-	out := new(big.Int)
-	if raw == "" {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	_, ok := out.SetString(raw, 10)
-	if !ok {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	return out, nil
-}
-
-func decimalToScaledIntFloor(value string, scale int) (*big.Int, error) {
-	parts := strings.Split(value, ".")
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	whole := parts[0]
-	frac := ""
-	if len(parts) == 2 {
-		frac = parts[1]
-	}
-	if len(frac) > scale {
-		frac = frac[:scale]
-	}
-	for len(frac) < scale {
-		frac += "0"
-	}
-	raw := whole + frac
-	out := new(big.Int)
-	if raw == "" {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	_, ok := out.SetString(raw, 10)
-	if !ok {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	return out, nil
-}
-
-func formatScaledInt(value *big.Int, scale int) string {
-	if scale == 0 {
-		return value.String()
-	}
-	s := value.String()
-	if len(s) <= scale {
-		s = strings.Repeat("0", scale-len(s)+1) + s
-	}
-	idx := len(s) - scale
-	return s[:idx] + "." + s[idx:]
-}
-
-func compareDecimal(a string, b string) (int, error) {
-	ra, ok := new(big.Rat).SetString(a)
-	if !ok {
-		return 0, fmt.Errorf("invalid decimal")
-	}
-	rb, ok := new(big.Rat).SetString(b)
-	if !ok {
-		return 0, fmt.Errorf("invalid decimal")
-	}
-	return ra.Cmp(rb), nil
-}
-
-func multiplyDecimal(a string, b string) (string, error) {
-	ra, ok := new(big.Rat).SetString(a)
-	if !ok {
-		return "", fmt.Errorf("invalid decimal")
-	}
-	rb, ok := new(big.Rat).SetString(b)
-	if !ok {
-		return "", fmt.Errorf("invalid decimal")
-	}
-	out := new(big.Rat).Mul(ra, rb)
-	return out.FloatString(8), nil
+	return out, "", nil
 }
