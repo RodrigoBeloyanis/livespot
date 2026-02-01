@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/RodrigoBeloyanis/livespot/internal/config"
@@ -17,12 +18,16 @@ import (
 )
 
 type LiveSnapshotProvider struct {
-	cfg     config.Config
-	client  *binance.Client
-	store   *BookTickerStore
-	filters map[string]binance.SymbolFilters
-	lastAccount binance.AccountInfo
+	cfg           config.Config
+	client        *binance.Client
+	store         *BookTickerStore
+	filters       map[string]binance.SymbolFilters
+	mu            sync.Mutex
+	lastAccount   binance.AccountInfo
 	lastAccountTs int64
+	lastTickers   []binance.Ticker24h
+	lastTickersTs int64
+	klinesCache   map[string]klineCacheEntry
 }
 
 type SnapshotBundle struct {
@@ -31,10 +36,18 @@ type SnapshotBundle struct {
 }
 
 func NewLiveSnapshotProvider(cfg config.Config, client *binance.Client, store *BookTickerStore, filters map[string]binance.SymbolFilters) *LiveSnapshotProvider {
-	return &LiveSnapshotProvider{cfg: cfg, client: client, store: store, filters: filters}
+	return &LiveSnapshotProvider{
+		cfg:         cfg,
+		client:      client,
+		store:       store,
+		filters:     filters,
+		klinesCache: map[string]klineCacheEntry{},
+	}
 }
 
 func (p *LiveSnapshotProvider) AccountInfo() (binance.AccountInfo, int64, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.lastAccountTs == 0 {
 		return binance.AccountInfo{}, 0, false
 	}
@@ -45,7 +58,8 @@ func (p *LiveSnapshotProvider) BuildSnapshots(ctx context.Context, now time.Time
 	if p.client == nil || p.store == nil {
 		return nil, fmt.Errorf("provider missing deps")
 	}
-	tickers, err := p.client.Ticker24hAll(ctx)
+	nowMs := now.UnixMilli()
+	tickers, err := p.getTickers(ctx, nowMs)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +85,10 @@ func (p *LiveSnapshotProvider) BuildSnapshots(ctx context.Context, now time.Time
 	if err != nil {
 		return nil, err
 	}
-	nowMs := now.UnixMilli()
+	accountInfo, err := p.getAccountInfo(ctx, nowMs)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]SnapshotBundle, 0, len(candidates))
 	for _, cand := range candidates {
 		f := p.filters[cand.Symbol]
@@ -90,19 +107,19 @@ func (p *LiveSnapshotProvider) BuildSnapshots(ctx context.Context, now time.Time
 		wsOK := nowMs-bookTs <= int64(p.cfg.WsStaleMsDegrade)
 		prices.LastPrice = cand.LastPrice
 
-		k5m, err := p.client.Klines(ctx, cand.Symbol, "5m", 80)
+		k5m, err := p.getKlines(ctx, cand.Symbol, "5m", 80, nowMs)
 		if err != nil {
 			continue
 		}
-		k1m, err := p.client.Klines(ctx, cand.Symbol, "1m", 50)
+		k1m, err := p.getKlines(ctx, cand.Symbol, "1m", 50, nowMs)
 		if err != nil {
 			continue
 		}
-		k15m, err := p.client.Klines(ctx, cand.Symbol, "15m", 50)
+		k15m, err := p.getKlines(ctx, cand.Symbol, "15m", 50, nowMs)
 		if err != nil {
 			continue
 		}
-		k1h, err := p.client.Klines(ctx, cand.Symbol, "1h", 50)
+		k1h, err := p.getKlines(ctx, cand.Symbol, "1h", 50, nowMs)
 		if err != nil {
 			continue
 		}
@@ -126,16 +143,6 @@ func (p *LiveSnapshotProvider) BuildSnapshots(ctx context.Context, now time.Time
 		if err != nil {
 			continue
 		}
-		account, err := p.client.Account(ctx)
-		if err != nil {
-			continue
-		}
-		accountInfo, err := binance.ParseAccountInfo(account.Body)
-		if err != nil {
-			continue
-		}
-		p.lastAccount = accountInfo
-		p.lastAccountTs = nowMs
 		snapshot := contracts.Snapshot{
 			Symbol: cand.Symbol,
 			Regime: regime,
@@ -199,6 +206,109 @@ func (p *LiveSnapshotProvider) BuildSnapshots(ctx context.Context, now time.Time
 		out = append(out, SnapshotBundle{Snapshot: built, Constraints: constraints})
 	}
 	return out, nil
+}
+
+type klineCacheEntry struct {
+	ts    int64
+	data  []binance.Kline
+	limit int
+}
+
+func (p *LiveSnapshotProvider) getTickers(ctx context.Context, nowMs int64) ([]binance.Ticker24h, error) {
+	const ttlMs = int64(15000)
+	p.mu.Lock()
+	if p.lastTickersTs > 0 && nowMs-p.lastTickersTs <= ttlMs && len(p.lastTickers) > 0 {
+		out := p.lastTickers
+		p.mu.Unlock()
+		return out, nil
+	}
+	p.mu.Unlock()
+	tickers, err := p.client.Ticker24hAll(ctx)
+	if err != nil {
+		p.mu.Lock()
+		if p.lastTickersTs > 0 && len(p.lastTickers) > 0 && nowMs-p.lastTickersTs <= ttlMs*2 {
+			out := p.lastTickers
+			p.mu.Unlock()
+			return out, nil
+		}
+		p.mu.Unlock()
+		return nil, err
+	}
+	p.mu.Lock()
+	p.lastTickers = tickers
+	p.lastTickersTs = nowMs
+	p.mu.Unlock()
+	return tickers, nil
+}
+
+func (p *LiveSnapshotProvider) getAccountInfo(ctx context.Context, nowMs int64) (binance.AccountInfo, error) {
+	const ttlMs = int64(10000)
+	p.mu.Lock()
+	if p.lastAccountTs > 0 && nowMs-p.lastAccountTs <= ttlMs {
+		info := p.lastAccount
+		p.mu.Unlock()
+		return info, nil
+	}
+	p.mu.Unlock()
+	account, err := p.client.Account(ctx)
+	if err != nil {
+		p.mu.Lock()
+		if p.lastAccountTs > 0 && nowMs-p.lastAccountTs <= ttlMs*2 {
+			info := p.lastAccount
+			p.mu.Unlock()
+			return info, nil
+		}
+		p.mu.Unlock()
+		return binance.AccountInfo{}, err
+	}
+	accountInfo, err := binance.ParseAccountInfo(account.Body)
+	if err != nil {
+		return binance.AccountInfo{}, err
+	}
+	p.mu.Lock()
+	p.lastAccount = accountInfo
+	p.lastAccountTs = nowMs
+	p.mu.Unlock()
+	return accountInfo, nil
+}
+
+func (p *LiveSnapshotProvider) getKlines(ctx context.Context, symbol string, interval string, limit int, nowMs int64) ([]binance.Kline, error) {
+	var ttlMs int64
+	switch interval {
+	case "1m":
+		ttlMs = 15000
+	case "5m":
+		ttlMs = 20000
+	case "15m":
+		ttlMs = 30000
+	case "1h":
+		ttlMs = 60000
+	default:
+		ttlMs = 15000
+	}
+	key := symbol + "|" + interval
+	p.mu.Lock()
+	if entry, ok := p.klinesCache[key]; ok && entry.limit == limit && nowMs-entry.ts <= ttlMs && len(entry.data) > 0 {
+		out := entry.data
+		p.mu.Unlock()
+		return out, nil
+	}
+	p.mu.Unlock()
+	klines, err := p.client.Klines(ctx, symbol, interval, limit)
+	if err != nil {
+		p.mu.Lock()
+		if entry, ok := p.klinesCache[key]; ok && entry.limit == limit && nowMs-entry.ts <= ttlMs*2 && len(entry.data) > 0 {
+			out := entry.data
+			p.mu.Unlock()
+			return out, nil
+		}
+		p.mu.Unlock()
+		return nil, err
+	}
+	p.mu.Lock()
+	p.klinesCache[key] = klineCacheEntry{ts: nowMs, data: klines, limit: limit}
+	p.mu.Unlock()
+	return klines, nil
 }
 
 type tickerCandidate struct {

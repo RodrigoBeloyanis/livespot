@@ -157,3 +157,10 @@ DECISION: Select candidate symbols by 24h quote volume over the configured minim
 MOTIVATION: Universe scan requires a deterministic candidate list; no higher-level doc defines a selection rule.
 IMPACT: internal\engine\state\live_provider.go
 RISKS / MITIGATIONS: If a fixed watchlist or different ranking basis is required, update the candidate selection and record the change.
+
+DATE: 2026-02-01
+TOPIC: Live REST cache TTLs to avoid Binance weight limits
+DECISION: Cache ticker24h (15s), account info (10s), and klines (1m=15s, 5m=20s, 15m=30s, 1h=60s) with fallback to last good data for up to 2x TTL.
+MOTIVATION: Live loop exceeded Binance request weight limits; caching reduces REST load while preserving freshness.
+IMPACT: internal\engine\state\live_provider.go
+RISKS / MITIGATIONS: Cached data may lag briefly; TTLs are conservative and can be adjusted if staleness affects decisions.
