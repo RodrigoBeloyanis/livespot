@@ -34,6 +34,14 @@ IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
 
 DATE: 2026-02-01
+DATE: 2026-02-01
+TOPIC: Binance WS base URL default
+DECISION: Use wss://stream.binance.com:9443 as the default WS base URL when none is provided.
+MOTIVATION: Required to implement Stage 10 WS subscriptions; no higher-priority document specifies a base URL.
+IMPACT: internal\infra\binance\ws.go
+RISKS / MITIGATIONS: If the official WS endpoint changes or regional endpoints are required, pass a different BaseURL via client options and record the change here.
+
+DATE: 2026-02-01
 TOPIC: Binance REST base URL default
 DECISION: Use https://api.binance.com as the default REST base URL when none is provided.
 MOTIVATION: Required to implement the Stage 09 REST client; no higher-priority document specifies a base URL.
