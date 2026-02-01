@@ -26,6 +26,8 @@ type Config struct {
 	ReconcileDriftPauseX10000              int
 	WebuiPort                              int
 	WebuiStreamSnapshotIntervalMs          int
+	WebuiIntentsRecentLimit                int
+	WebuiReconcileDiffsRecentLimit         int
 	TimeSyncRecvWindowMs                   int
 	TimeSyncIntervalMs                     int
 	ClockDriftMaxMsLive                    int
@@ -35,6 +37,8 @@ type Config struct {
 	AIGateTimeoutMs                        int
 	AIGateModel                            string
 	OpenAIBaseURL                          string
+	IntentMaxRestQueries                   int
+	IntentRestQueryTimeoutMs               int
 	TopNSize                               int
 	TopKSize                               int
 	RankWeightLiquidity                    float64
@@ -144,6 +148,8 @@ func Default() Config {
 		ReconcileDriftPauseX10000:              50000,
 		WebuiPort:                              8787,
 		WebuiStreamSnapshotIntervalMs:          1000,
+		WebuiIntentsRecentLimit:                50,
+		WebuiReconcileDiffsRecentLimit:         50,
 		TimeSyncRecvWindowMs:                   5000,
 		TimeSyncIntervalMs:                     300000,
 		ClockDriftMaxMsLive:                    500,
@@ -153,6 +159,8 @@ func Default() Config {
 		AIGateTimeoutMs:                        8000,
 		AIGateModel:                            "gpt-4o-mini",
 		OpenAIBaseURL:                          "https://api.openai.com/v1",
+		IntentMaxRestQueries:                   3,
+		IntentRestQueryTimeoutMs:               5000,
 		TopNSize:                               20,
 		TopKSize:                               3,
 		RankWeightLiquidity:                    0.55,

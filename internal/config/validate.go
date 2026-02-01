@@ -93,6 +93,12 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("webui_stream_snapshot_interval_ms", cfg.WebuiStreamSnapshotIntervalMs); err != nil {
 		return err
 	}
+	if err := requireRangeInt("webui_intents_recent_limit", cfg.WebuiIntentsRecentLimit, 10, 200); err != nil {
+		return err
+	}
+	if err := requireRangeInt("webui_reconcile_diffs_recent_limit", cfg.WebuiReconcileDiffsRecentLimit, 10, 200); err != nil {
+		return err
+	}
 	if err := requirePositiveInt("time_sync_recv_window_ms", cfg.TimeSyncRecvWindowMs); err != nil {
 		return err
 	}
@@ -118,6 +124,12 @@ func Validate(cfg Config, stat StatFunc) error {
 		return err
 	}
 	if err := requireNonEmpty("openai_base_url", cfg.OpenAIBaseURL); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("intent_max_rest_queries", cfg.IntentMaxRestQueries); err != nil {
+		return err
+	}
+	if err := requirePositiveInt("intent_rest_query_timeout_ms", cfg.IntentRestQueryTimeoutMs); err != nil {
 		return err
 	}
 	if err := requirePositiveInt("topn_size", cfg.TopNSize); err != nil {
