@@ -1,4 +1,4 @@
-00_SOURCE_OF_TRUTH (SYSTEM LAW)
+﻿00_SOURCE_OF_TRUTH (SYSTEM LAW)
 
 PURPOSE
 Define the authority hierarchy, non-negotiable principles, and conflict-resolution rules.
@@ -20,7 +20,7 @@ L) 11_INVARIANTS_MAP.md (derived invariants map; does not create new rules)
 M) 12_DECISIONS_LOG.md (history and rationale; does not replace rules)
 
 AUXILIARY DOCUMENTS (NO NORMATIVE AUTHORITY)
-- README.md (operational usage manual; does not create rules, does not alter contracts, and never takes precedence over 00�12)
+- README.md (operational usage manual; does not create rules, does not alter contracts, and never takes precedence over 00–12)
 
 CONFLICT RULE
 - If a weaker document contradicts a stronger one: the stronger one prevails.
@@ -182,6 +182,7 @@ Verification source: internal\config\config.go (Config struct / defaults).
 - disk_free_pause_bytes: 536870912 (512 MB)
 - audit_writer_queue_hi_watermark_pct: 80
 - audit_writer_queue_full_pct: 95
+- audit_writer_queue_capacity: 1024 (events)
 - audit_writer_max_lag_ms: 5000 (5 seconds)
 - reconcile_rest_interval_ms: 5000 (5 seconds)
 - reconcile_drift_degrade_score_x10000: 20000 (x10000 scale; 2.0000)

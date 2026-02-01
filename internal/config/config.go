@@ -19,6 +19,7 @@ type Config struct {
 	DiskFreePauseBytes            int64
 	AuditWriterQueueHiWatermark   int
 	AuditWriterQueueFull          int
+	AuditWriterQueueCapacity      int
 	AuditWriterMaxLagMs           int
 	ReconcileRestIntervalMs       int
 	ReconcileDriftDegradeX10000   int
@@ -49,6 +50,7 @@ func Default() Config {
 		DiskFreePauseBytes:            536870912,
 		AuditWriterQueueHiWatermark:   80,
 		AuditWriterQueueFull:          95,
+		AuditWriterQueueCapacity:      1024,
 		AuditWriterMaxLagMs:           5000,
 		ReconcileRestIntervalMs:       5000,
 		ReconcileDriftDegradeX10000:   20000,

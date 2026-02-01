@@ -29,6 +29,14 @@ func TestValidateInvalidValue(t *testing.T) {
 	}
 }
 
+func TestValidateInvalidQueueCapacity(t *testing.T) {
+	cfg := Default()
+	cfg.AuditWriterQueueCapacity = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for invalid audit_writer_queue_capacity")
+	}
+}
+
 func TestValidateLiveOKFileMissing(t *testing.T) {
 	cfg := Default()
 	cfg.LiveRequireOKFile = true
