@@ -37,6 +37,24 @@ func TestValidateInvalidQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestValidateAIGateDefaults(t *testing.T) {
+	cfg := Default()
+	cfg.AIGateTimeoutMs = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for ai_gate_timeout_ms")
+	}
+	cfg = Default()
+	cfg.AIGateModel = ""
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for ai_gate_model")
+	}
+	cfg = Default()
+	cfg.OpenAIBaseURL = ""
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for openai_base_url")
+	}
+}
+
 func TestValidateLiveOKFileMissing(t *testing.T) {
 	cfg := Default()
 	cfg.LiveRequireOKFile = true

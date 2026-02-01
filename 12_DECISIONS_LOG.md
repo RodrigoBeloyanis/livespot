@@ -32,3 +32,10 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: AI Gate defaults
+DECISION: Add ai_gate_timeout_ms=8000, ai_gate_model=gpt-4o-mini, and openai_base_url=https://api.openai.com/v1.
+MOTIVATION: AI Gate requires deterministic API timeouts/model selection and a single base URL for OpenAI calls.
+IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: If model selection changes, update defaults and revalidate prompts and schema compatibility.

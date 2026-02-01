@@ -32,6 +32,9 @@ type Config struct {
 	ClockDriftMaxMsPaper          int
 	DiskHealthSampleIntervalMs    int
 	AuditRedactedJSONMaxBytes     int
+	AIGateTimeoutMs               int
+	AIGateModel                   string
+	OpenAIBaseURL                 string
 }
 
 func Default() Config {
@@ -63,6 +66,9 @@ func Default() Config {
 		ClockDriftMaxMsPaper:          2000,
 		DiskHealthSampleIntervalMs:    5000,
 		AuditRedactedJSONMaxBytes:     4096,
+		AIGateTimeoutMs:               8000,
+		AIGateModel:                   "gpt-4o-mini",
+		OpenAIBaseURL:                 "https://api.openai.com/v1",
 	}
 }
 

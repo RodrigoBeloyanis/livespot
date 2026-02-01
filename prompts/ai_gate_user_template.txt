@@ -1,0 +1,4 @@
+﻿Return a JSON object that follows the schema for AIGateResult using the payload below.
+
+Payload:
+{{payload_json}}

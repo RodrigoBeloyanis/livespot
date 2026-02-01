@@ -110,6 +110,15 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("audit_redacted_json_max_bytes", cfg.AuditRedactedJSONMaxBytes); err != nil {
 		return err
 	}
+	if err := requirePositiveInt("ai_gate_timeout_ms", cfg.AIGateTimeoutMs); err != nil {
+		return err
+	}
+	if err := requireNonEmpty("ai_gate_model", cfg.AIGateModel); err != nil {
+		return err
+	}
+	if err := requireNonEmpty("openai_base_url", cfg.OpenAIBaseURL); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -137,6 +146,13 @@ func requirePct(field string, v int) error {
 func requirePort(field string, v int) error {
 	if v < 1 || v > 65535 {
 		return ValidationError{Field: field, Message: "must be in [1..65535]"}
+	}
+	return nil
+}
+
+func requireNonEmpty(field string, v string) error {
+	if v == "" {
+		return ValidationError{Field: field, Message: "missing"}
 	}
 	return nil
 }
