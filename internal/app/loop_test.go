@@ -21,7 +21,7 @@ func TestRunDryRunEmitsStageEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writer create: %v", err)
 	}
-	loop, err := NewLoop(cfg, writer, observability.ConsoleStageReporter{}, time.Now, nil, nil, nil, nil, nil, nil)
+	loop, err := NewLoop(cfg, writer, observability.ConsoleStageReporter{}, time.Now, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("new loop: %v", err)
 	}

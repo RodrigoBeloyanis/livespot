@@ -18,6 +18,7 @@ import (
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/executor"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/health"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/persist"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/position"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/rank"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/risk"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/state"
@@ -43,6 +44,8 @@ type Loop struct {
 	orderClient executor.OrderRestClient
 	intentLookup executor.RestClient
 	ocoClient executor.OCOClient
+	reconcileClient reconcileClient
+	lastReconcileMs int64
 	selectionStore *persist.SelectionStore
 	prevTopK []string
 	cyclesSincePrev int
@@ -58,7 +61,7 @@ type Loop struct {
 	forceExit         bool
 }
 
-func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate, orderClient executor.OrderRestClient, intentLookup executor.RestClient, ocoClient executor.OCOClient) (*Loop, error) {
+func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate, orderClient executor.OrderRestClient, intentLookup executor.RestClient, ocoClient executor.OCOClient, reconcileClient reconcileClient) (*Loop, error) {
 	if writer == nil {
 		return nil, fmt.Errorf("audit writer missing")
 	}
@@ -84,6 +87,7 @@ func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.Sta
 		orderClient:  orderClient,
 		intentLookup: intentLookup,
 		ocoClient:    ocoClient,
+		reconcileClient: reconcileClient,
 		selectionStore: persist.NewSelectionStore(db),
 	}, nil
 }
@@ -149,6 +153,9 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 		return err
 	}
 	if err := l.persistSnapshots(ctx, bundles); err != nil {
+		return err
+	}
+	if err := l.reconcileIfDue(ctx, runID, cycleID); err != nil {
 		return err
 	}
 
@@ -691,6 +698,101 @@ func (l *Loop) emitProtectionSubmit(runID string, cycleID string, decision contr
 	if err := l.writer.Write(record); err != nil {
 		return fmt.Errorf("audit protection submit write: %w", err)
 	}
+	return nil
+}
+
+type reconcileClient interface {
+	OpenOrders(ctx context.Context) ([]binance.OpenOrder, error)
+}
+
+func (l *Loop) reconcileIfDue(ctx context.Context, runID string, cycleID string) error {
+	if l.reconcileClient == nil || l.db == nil {
+		return nil
+	}
+	now := l.now()
+	if l.lastReconcileMs > 0 && now.UnixMilli()-l.lastReconcileMs < int64(l.cfg.ReconcileRestIntervalMs) {
+		return nil
+	}
+	l.lastReconcileMs = now.UnixMilli()
+	if err := l.emitStage(runID, cycleID, observability.RECONCILE_REST, "", "reconcile"); err != nil {
+		return err
+	}
+	openOrders, err := l.reconcileClient.OpenOrders(ctx)
+	if err != nil {
+		return err
+	}
+	confirmed, err := sqlite.ListOrderIntentsByState(ctx, l.db, string(executor.IntentConfirmed), 1000)
+	if err != nil {
+		return err
+	}
+	openIndex := map[string]binance.OpenOrder{}
+	for _, ord := range openOrders {
+		openIndex[ord.ClientOrderID] = ord
+	}
+	missing := 0
+	for _, intent := range confirmed {
+		if intent.ClientOrderID == "" {
+			continue
+		}
+		if _, ok := openIndex[intent.ClientOrderID]; !ok {
+			missing++
+		}
+	}
+	extra := 0
+	intentIndex := map[string]struct{}{}
+	for _, intent := range confirmed {
+		if intent.ClientOrderID == "" {
+			continue
+		}
+		intentIndex[intent.ClientOrderID] = struct{}{}
+	}
+	for _, ord := range openOrders {
+		if ord.ClientOrderID == "" {
+			continue
+		}
+		if _, ok := intentIndex[ord.ClientOrderID]; !ok {
+			extra++
+		}
+	}
+	diff := position.DriftDiff{
+		OrdersMissing:         missing,
+		OrdersExtra:           extra,
+		OrdersStatusMismatch:  0,
+		PositionsQtyMismatch:  0,
+		PositionsSideMismatch: 0,
+		BalancesMismatch:      0,
+		ProtectionMismatch:    0,
+	}
+	score := diff.DriftScoreX10000()
+	if score > 0 {
+		ctxRec := position.ReconcileContext{
+			RunID:          runID,
+			CycleID:        cycleID,
+			Mode:           l.cfg.Mode,
+			SnapshotID:     "",
+			DecisionID:     "",
+			ExchangeTimeMs: 0,
+		}
+		diffRecord := position.BuildReconcileDiffRecord(now, ctxRec, diff, score)
+		if err := l.writer.Write(diffRecord); err != nil {
+			return err
+		}
+		action := position.EvaluateDriftAction(l.cfg, score)
+		if action != position.DriftNone {
+			alertRecord := position.BuildReconcileAlertRecord(now, ctxRec, score, action)
+			if err := l.writer.Write(alertRecord); err != nil {
+				return err
+			}
+			if action == position.DriftPause {
+				l.sysMode = health.SysModePause
+			}
+			if action == position.DriftDegrade {
+				l.sysMode = health.SysModeDegrade
+			}
+			l.sysModeSince = now
+		}
+	}
+	l.UpdateRESTLastSuccess(now)
 	return nil
 }
 

@@ -88,6 +88,18 @@ func (b *BinanceOrderClient) SubmitOCO(ctx context.Context, req OCORequest) (OCO
 	return parseOCOResponse(resp.Body)
 }
 
+func (b *BinanceOrderClient) OpenOrders(ctx context.Context) ([]binance.OpenOrder, error) {
+	resp, err := b.client.OpenOrders(ctx, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+	orders, err := binance.ParseOpenOrders(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+
 func (b *BinanceOrderClient) GetOrderByClientID(ctx context.Context, symbol string, clientOrderID string) (OrderResponse, error) {
 	params := url.Values{}
 	params.Set("symbol", symbol)
