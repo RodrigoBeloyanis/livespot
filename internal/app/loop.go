@@ -15,6 +15,7 @@ import (
 	"github.com/RodrigoBeloyanis/livespot/internal/domain/reasoncodes"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/aigate"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/deepscan"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/executor"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/health"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/persist"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/rank"
@@ -38,6 +39,9 @@ type Loop struct {
 	db       *sql.DB
 	provider *state.LiveSnapshotProvider
 	gate     *aigate.Gate
+	ledger   *executor.LedgerService
+	orderClient executor.OrderRestClient
+	intentLookup executor.RestClient
 	selectionStore *persist.SelectionStore
 	prevTopK []string
 	cyclesSincePrev int
@@ -53,12 +57,16 @@ type Loop struct {
 	forceExit         bool
 }
 
-func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate) (*Loop, error) {
+func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate, orderClient executor.OrderRestClient, intentLookup executor.RestClient) (*Loop, error) {
 	if writer == nil {
 		return nil, fmt.Errorf("audit writer missing")
 	}
 	if now == nil {
 		now = time.Now
+	}
+	var ledger *executor.LedgerService
+	if db != nil {
+		ledger = executor.NewLedger(db, now)
 	}
 	return &Loop{
 		cfg:          cfg,
@@ -71,6 +79,9 @@ func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.Sta
 		db:           db,
 		provider:     provider,
 		gate:         gate,
+		ledger:       ledger,
+		orderClient:  orderClient,
+		intentLookup: intentLookup,
 		selectionStore: persist.NewSelectionStore(db),
 	}, nil
 }
@@ -284,6 +295,34 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 		}
 		if err := l.persistDecision(ctx, runID, cycleID, decision); err != nil {
 			return err
+		}
+		if decision.Intent == contracts.IntentEntry && decision.RiskVerdict != nil && decision.RiskVerdict.Verdict == contracts.RiskAllow {
+			if decision.AIGate != nil && (decision.AIGate.Verdict == contracts.AIGateBlock || decision.AIGate.Verdict == contracts.AIGateError) {
+				continue
+			}
+			if l.orderClient == nil || l.ledger == nil {
+				return fmt.Errorf("order execution deps missing")
+			}
+			if err := l.emitStage(runID, cycleID, observability.EXECUTE_INTENT, sym, "entry submit"); err != nil {
+				return err
+			}
+			resp, intentID, reason, err := executor.ExecuteEntry(ctx, l.ledger, l.orderClient, decision, bundle.Snapshot.Metadata.SnapshotHash, runID, cycleID, l.now())
+			if err != nil {
+				if reason == reasoncodes.INTENT_SENT_UNKNOWN && l.intentLookup != nil && l.db != nil {
+					intent, ierr := sqlite.GetOrderIntent(ctx, l.db, intentID)
+					if ierr != nil {
+						return ierr
+					}
+					if rerr := executor.ResolveSentUnknown(ctx, l.cfg, l.ledger, l.intentLookup, intent); rerr != nil {
+						return rerr
+					}
+				}
+				_ = l.emitOrderSubmit(runID, cycleID, decision, intentID, resp, reason)
+				return err
+			}
+			if err := l.emitOrderSubmit(runID, cycleID, decision, intentID, resp, reason); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -570,6 +609,41 @@ func (l *Loop) persistDecision(ctx context.Context, runID string, cycleID string
 		CreatedAtMs:     decision.TsMs,
 	}
 	return sqlite.InsertDecision(ctx, l.db, rec)
+}
+
+func (l *Loop) emitOrderSubmit(runID string, cycleID string, decision contracts.Decision, intentID string, resp executor.OrderResponse, reason reasoncodes.ReasonCode) error {
+	now := l.now()
+	reasons := []reasoncodes.ReasonCode{}
+	if reason != "" {
+		reasons = append(reasons, reason)
+	}
+	record := audit.Record{
+		Event: auditdomain.AuditEvent{
+			TsMs:            now.UnixMilli(),
+			RunID:           runID,
+			CycleID:         cycleID,
+			Mode:            l.cfg.Mode,
+			Stage:           observability.EXECUTE_INTENT,
+			EventType:       auditdomain.ORDER_SUBMIT,
+			Reasons:         reasons,
+			SnapshotID:      decision.SnapshotID,
+			DecisionID:      decision.DecisionID,
+			OrderIntentID:   intentID,
+			ExchangeTimeMs:  0,
+			LocalReceivedMs: now.UnixMilli(),
+		},
+		Data: map[string]any{
+			"symbol":          decision.Symbol,
+			"client_order_id": resp.ClientOrderID,
+			"order_id":        resp.OrderID,
+			"status":          resp.Status,
+			"rejected":        resp.Rejected,
+		},
+	}
+	if err := l.writer.Write(record); err != nil {
+		return fmt.Errorf("audit order submit write: %w", err)
+	}
+	return nil
 }
 
 func findBundle(bundles []state.SnapshotBundle, symbol string) (state.SnapshotBundle, bool) {

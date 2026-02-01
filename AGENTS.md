@@ -222,6 +222,19 @@ Stage 11 - Execution core (intents + quantization)
 - Enforce quantization and filter validation before any submit/cancel/replace.
 - Add REST adapter for Binance order submission and clientOrderId lookup.
 
+Stage 12 - Execution wiring (entry submit)
+- Integrate entry execution into the loop after RiskVerdict and AIGate checks.
+- Emit ORDER_SUBMIT audit events with order_intent_id and status.
+- Fail-closed if execution dependencies are missing.
+
+Stage 13 - Protection core (OCO + TP/SL)
+- Place protection orders immediately after entry confirmation.
+- Ensure no protection gaps (confirm new protection before canceling old).
+
+Stage 14 - Reconcile + drift enforcement
+- Implement REST reconcile loop and drift scoring.
+- Enter DEGRADE/PAUSE based on drift thresholds and audit RECONCILE_DIFF.
+
 
 ---
 
@@ -271,7 +284,6 @@ If blocked:
 - Output `MISSING_INFORMATION (BLOCKER)` and STOP.
 
 ---
-
 
 
 

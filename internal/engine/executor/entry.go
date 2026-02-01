@@ -48,11 +48,7 @@ func BuildEntryOrder(decision contracts.Decision) (OrderRequest, error) {
 	return req, nil
 }
 
-func BuildEntryIntent(decision contracts.Decision, snapshotHash string, runID string, cycleID string, req OrderRequest, now time.Time) (sqlite.OrderIntentRecord, error) {
-	intentID, err := OrderIntentID(decision, snapshotHash)
-	if err != nil {
-		return sqlite.OrderIntentRecord{}, err
-	}
+func BuildEntryIntent(decision contracts.Decision, intentID string, runID string, cycleID string, req OrderRequest, now time.Time) (sqlite.OrderIntentRecord, error) {
 	payload, err := hash.CanonicalJSON(req)
 	if err != nil {
 		return sqlite.OrderIntentRecord{}, err
@@ -72,29 +68,33 @@ func BuildEntryIntent(decision contracts.Decision, snapshotHash string, runID st
 	}, nil
 }
 
-func ExecuteEntry(ctx context.Context, ledger *LedgerService, rest OrderRestClient, decision contracts.Decision, snapshotHash string, runID string, cycleID string, now time.Time) (OrderResponse, reasoncodes.ReasonCode, error) {
+func ExecuteEntry(ctx context.Context, ledger *LedgerService, rest OrderRestClient, decision contracts.Decision, snapshotHash string, runID string, cycleID string, now time.Time) (OrderResponse, string, reasoncodes.ReasonCode, error) {
+	intentID, err := OrderIntentID(decision, snapshotHash)
+	if err != nil {
+		return OrderResponse{}, "", reasoncodes.STRAT_ENTRY_ABORTED_COST, err
+	}
 	req, err := BuildEntryOrder(decision)
 	if err != nil {
-		return OrderResponse{}, reasoncodes.STRAT_ENTRY_ABORTED_COST, err
+		return OrderResponse{}, intentID, reasoncodes.STRAT_ENTRY_ABORTED_COST, err
 	}
 	filters := FiltersFromConstraints(decision.Constraints)
 	quantized, reason, err := QuantizeOrder(req, filters)
 	if err != nil {
-		return OrderResponse{}, reason, err
+		return OrderResponse{}, intentID, reason, err
 	}
-	intent, err := BuildEntryIntent(decision, snapshotHash, runID, cycleID, quantized, now)
+	intent, err := BuildEntryIntent(decision, intentID, runID, cycleID, quantized, now)
 	if err != nil {
-		return OrderResponse{}, reasoncodes.STRAT_ENTRY_ABORTED_COST, err
+		return OrderResponse{}, intentID, reasoncodes.STRAT_ENTRY_ABORTED_COST, err
 	}
 	resp, err := SubmitWithIntent(ctx, ledger, rest, intent, quantized)
 	if err != nil {
 		if err == ErrSentUnknown {
-			return OrderResponse{}, reasoncodes.INTENT_SENT_UNKNOWN, err
+			return OrderResponse{}, intentID, reasoncodes.INTENT_SENT_UNKNOWN, err
 		}
-		return OrderResponse{}, reasoncodes.ORDER_SUBMIT_REJECTED, err
+		return OrderResponse{}, intentID, reasoncodes.ORDER_SUBMIT_REJECTED, err
 	}
 	if resp.Rejected {
-		return resp, reasoncodes.ORDER_SUBMIT_REJECTED, nil
+		return resp, intentID, reasoncodes.ORDER_SUBMIT_REJECTED, nil
 	}
-	return resp, "", nil
+	return resp, intentID, "", nil
 }

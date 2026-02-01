@@ -12,6 +12,7 @@ import (
 	"github.com/RodrigoBeloyanis/livespot/internal/audit"
 	"github.com/RodrigoBeloyanis/livespot/internal/config"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/aigate"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/executor"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/state"
 	"github.com/RodrigoBeloyanis/livespot/internal/infra/binance"
 	"github.com/RodrigoBeloyanis/livespot/internal/infra/openai"
@@ -110,7 +111,8 @@ func main() {
 		log.Fatalf("ai gate init failed: %v", err)
 	}
 	reporter := observability.NewThrottledStageReporter(15 * time.Second)
-	loop, err := app.NewLoop(cfg, writer, reporter, time.Now, webDB, provider, gate)
+	orderClient := executor.NewBinanceOrderClient(restClient)
+	loop, err := app.NewLoop(cfg, writer, reporter, time.Now, webDB, provider, gate, orderClient, orderClient)
 	if err != nil {
 		log.Fatalf("loop init failed: %v", err)
 	}
