@@ -73,6 +73,21 @@ func RedactAndTruncateJSON(raw []byte, maxBytes int, policy RedactionPolicy) (st
 	return string(buf), nil
 }
 
+func RedactMap(data map[string]any, policy RedactionPolicy) (map[string]any, error) {
+	if data == nil {
+		return map[string]any{}, nil
+	}
+	cleaned, err := sanitizeValue(data, policy)
+	if err != nil {
+		return nil, err
+	}
+	cleanedMap, ok := cleaned.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("redact map invalid type")
+	}
+	return cleanedMap, nil
+}
+
 func sanitizeValue(value any, policy RedactionPolicy) (any, error) {
 	switch v := value.(type) {
 	case map[string]any:

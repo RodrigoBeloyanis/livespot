@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RodrigoBeloyanis/livespot/internal/config"
+	"github.com/RodrigoBeloyanis/livespot/internal/domain/hash"
 	"github.com/RodrigoBeloyanis/livespot/internal/infra/sqlite"
 )
 
@@ -19,6 +20,8 @@ type Writer struct {
 	db            *sql.DB
 	closed        chan struct{}
 	wg            sync.WaitGroup
+	redactPolicy  RedactionPolicy
+	redactMax     int
 }
 
 type writeRequest struct {
@@ -65,6 +68,8 @@ func NewWriter(cfg config.Config, opts WriterOptions) (*Writer, error) {
 		jsonl:         jsonl,
 		db:            db,
 		closed:        make(chan struct{}),
+		redactPolicy:  DefaultRedactionPolicy(),
+		redactMax:     cfg.AuditRedactedJSONMaxBytes,
 	}
 	writer.wg.Add(1)
 	go writer.run(opts.Now)
@@ -125,9 +130,9 @@ func (w *Writer) run(now func() time.Time) {
 }
 
 func (w *Writer) writeOnce(record Record) error {
-	dataJSON, err := record.DataJSON()
+	redactedData, dataJSON, err := redactData(record.Data, w.redactMax, w.redactPolicy)
 	if err != nil {
-		return fmt.Errorf("audit data json: %w", err)
+		return fmt.Errorf("audit data redact: %w", err)
 	}
 	reasonsJSON, err := recordReasonsJSON(record)
 	if err != nil {
@@ -136,7 +141,7 @@ func (w *Writer) writeOnce(record Record) error {
 	if err := w.writeSQLite(record, reasonsJSON, dataJSON); err != nil {
 		return err
 	}
-	line, err := record.JSONLine()
+	line, err := record.JSONLineWithData(redactedData)
 	if err != nil {
 		return fmt.Errorf("audit jsonl: %w", err)
 	}
@@ -154,6 +159,22 @@ func recordReasonsJSON(record Record) (string, error) {
 		return "", fmt.Errorf("audit reasons json: %w", err)
 	}
 	return string(buf), nil
+}
+
+func redactData(data map[string]any, maxBytes int, policy RedactionPolicy) (map[string]any, string, error) {
+	cleaned, err := RedactMap(data, policy)
+	if err != nil {
+		return nil, "", err
+	}
+	buf, err := hash.CanonicalJSON(cleaned)
+	if err != nil {
+		return nil, "", fmt.Errorf("audit data canonical json: %w", err)
+	}
+	if len(buf) > maxBytes {
+		truncated := fmt.Sprintf("<TRUNCATED len_bytes=%d>", len(buf))
+		return map[string]any{"data_truncated": truncated}, truncated, nil
+	}
+	return cleaned, string(buf), nil
 }
 
 func (w *Writer) writeSQLite(record Record, reasonsJSON string, dataJSON string) error {

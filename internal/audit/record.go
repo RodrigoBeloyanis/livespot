@@ -41,6 +41,10 @@ func (r Record) Validate() error {
 }
 
 func (r Record) JSONLine() ([]byte, error) {
+	return r.JSONLineWithData(r.Data)
+}
+
+func (r Record) JSONLineWithData(data map[string]any) ([]byte, error) {
 	line := map[string]any{
 		"ts_ms":             r.Event.TsMs,
 		"run_id":            r.Event.RunID,
@@ -55,7 +59,7 @@ func (r Record) JSONLine() ([]byte, error) {
 		"exchange_time_ms":  r.Event.ExchangeTimeMs,
 		"local_received_ms": r.Event.LocalReceivedMs,
 	}
-	for key, value := range r.Data {
+	for key, value := range data {
 		line[key] = value
 	}
 	return json.Marshal(line)
