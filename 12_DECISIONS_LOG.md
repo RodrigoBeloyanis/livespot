@@ -32,3 +32,10 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: Binance REST base URL default
+DECISION: Use https://api.binance.com as the default REST base URL when none is provided.
+MOTIVATION: Required to implement the Stage 09 REST client; no higher-priority document specifies a base URL.
+IMPACT: internal\infra\binance\rest.go
+RISKS / MITIGATIONS: If the official base URL changes or regional endpoints are required, pass a different BaseURL via client options and record the change here.
