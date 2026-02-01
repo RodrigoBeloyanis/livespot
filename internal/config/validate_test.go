@@ -37,6 +37,29 @@ func TestValidateInvalidQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestValidateRetentionDefaults(t *testing.T) {
+	cfg := Default()
+	cfg.JSONLRetentionDays = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for jsonl_retention_days")
+	}
+	cfg = Default()
+	cfg.LogRetentionDays = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for log_retention_days")
+	}
+	cfg = Default()
+	cfg.SQLiteBackupRetentionDays = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for sqlite_backup_retention_days")
+	}
+	cfg = Default()
+	cfg.SQLiteBackupDir = ""
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for sqlite_backup_dir")
+	}
+}
+
 func TestValidateLiveOKFileMissing(t *testing.T) {
 	cfg := Default()
 	cfg.LiveRequireOKFile = true
