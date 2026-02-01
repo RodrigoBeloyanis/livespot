@@ -159,6 +159,18 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 		return err
 	}
 
+	snapshotsCount := len(bundles)
+	topnCount := 0
+	topkCount := 0
+	decisionsCount := 0
+	decisionsRiskBlocked := 0
+	decisionsAIGateBlocked := 0
+	decisionsProposedFailed := 0
+	entriesSubmitted := 0
+	ocoSubmitted := 0
+	lastDecisionID := ""
+	lastSymbol := ""
+
 	snapshotList := make([]state.SnapshotBundle, 0, len(bundles))
 	snapshotsOnly := make([]contracts.Snapshot, 0, len(bundles))
 	for _, bundle := range bundles {
@@ -191,6 +203,7 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 	if err := l.emitStage(runID, cycleID, observability.RANK_TOPN, "", "ranked"); err != nil {
 		return err
 	}
+	topnCount = len(ranked)
 
 	topnSnapshots := filterSnapshotsByRank(snapshotsOnly, ranked)
 	deepResults, err := deepscan.DeepScan(l.cfg, topnSnapshots)
@@ -221,6 +234,7 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 	for _, sel := range result.TopK {
 		topkSymbols = append(topkSymbols, sel.Symbol)
 	}
+	topkCount = len(topkSymbols)
 	if err := l.selectionStore.InsertSelection(runID, cycleID, symbolsFromRank(ranked), topkSymbols, topkSymbols, result.ChurnGuardApplied, len(result.PairsOverLimit) > 0, result.MaxPairwiseCorr, result.PairsOverLimit, rankedConfigHash(ranked), l.now()); err != nil {
 		return err
 	}
@@ -237,8 +251,12 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 		}
 		decision, err := strategy.ProposeEntry(l.cfg, bundle.Snapshot, bundle.Constraints, cycleID, l.now())
 		if err != nil {
+			decisionsProposedFailed++
 			continue
 		}
+		decisionsCount++
+		lastDecisionID = decision.DecisionID
+		lastSymbol = decision.Symbol
 		if err := l.emitStage(runID, cycleID, observability.STRATEGY_PROPOSE, sym, "decision"); err != nil {
 			return err
 		}
@@ -299,6 +317,9 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 			return err
 		}
 		decision.RiskVerdict = &verdict
+		if verdict.Verdict == contracts.RiskBlock {
+			decisionsRiskBlocked++
+		}
 		if err := l.emitStage(runID, cycleID, observability.RISK_VERDICT, sym, string(verdict.Verdict)); err != nil {
 			return err
 		}
@@ -307,6 +328,7 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 		}
 		if decision.Intent == contracts.IntentEntry && decision.RiskVerdict != nil && decision.RiskVerdict.Verdict == contracts.RiskAllow {
 			if decision.AIGate != nil && (decision.AIGate.Verdict == contracts.AIGateBlock || decision.AIGate.Verdict == contracts.AIGateError) {
+				decisionsAIGateBlocked++
 				continue
 			}
 			if l.orderClient == nil || l.ledger == nil {
@@ -329,6 +351,7 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 				_ = l.emitOrderSubmit(runID, cycleID, decision, intentID, resp, reason)
 				return err
 			}
+			entriesSubmitted++
 			if err := l.emitOrderSubmit(runID, cycleID, decision, intentID, resp, reason); err != nil {
 				return err
 			}
@@ -340,10 +363,15 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 				_ = l.emitProtectionSubmit(runID, cycleID, decision, ocoIntentID, ocoResp, ocoReason)
 				return err
 			}
+			ocoSubmitted++
 			if err := l.emitProtectionSubmit(runID, cycleID, decision, ocoIntentID, ocoResp, ocoReason); err != nil {
 				return err
 			}
 		}
+	}
+	summary := fmt.Sprintf("cycle summary snapshots=%d topn=%d topk=%d decisions=%d risk_block=%d ai_block=%d propose_fail=%d entries=%d oco=%d last_symbol=%s last_decision=%s", snapshotsCount, topnCount, topkCount, decisionsCount, decisionsRiskBlocked, decisionsAIGateBlocked, decisionsProposedFailed, entriesSubmitted, ocoSubmitted, lastSymbol, lastDecisionID)
+	if err := l.emitStage(runID, cycleID, observability.STATE_UPDATE, "", summary); err != nil {
+		return err
 	}
 	return nil
 }
