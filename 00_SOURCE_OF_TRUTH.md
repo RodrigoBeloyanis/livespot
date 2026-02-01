@@ -190,6 +190,9 @@ Verification source: internal\config\config.go (Config struct / defaults).
 
 - webui_port: 8787 (TCP port; local-only)
 - webui_stream_snapshot_interval_ms: 1000 (1 second)
+- webui_intents_recent_limit: 50
+- webui_reconcile_diffs_recent_limit: 50
+- webui_market_symbols_limit: 50
 - time_sync_recv_window_ms: 5000 (5 seconds; Binance signed calls)
 - time_sync_interval_ms: 300000 (5 minutes)
 - clock_drift_max_ms_live: 500 (0.5 seconds)

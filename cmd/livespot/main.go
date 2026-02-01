@@ -9,7 +9,9 @@ import (
 	"github.com/RodrigoBeloyanis/livespot/internal/app"
 	"github.com/RodrigoBeloyanis/livespot/internal/audit"
 	"github.com/RodrigoBeloyanis/livespot/internal/config"
+	"github.com/RodrigoBeloyanis/livespot/internal/infra/sqlite"
 	"github.com/RodrigoBeloyanis/livespot/internal/observability"
+	"github.com/RodrigoBeloyanis/livespot/internal/webui"
 )
 
 func main() {
@@ -26,6 +28,27 @@ func main() {
 	}
 	defer func() {
 		_ = writer.Close()
+	}()
+
+	webDB, err := sqlite.Open(audit.DefaultSQLitePath, cfg)
+	if err != nil {
+		log.Fatalf("webui db open failed: %v", err)
+	}
+	defer func() {
+		_ = webDB.Close()
+	}()
+	if err := sqlite.Migrate(webDB, time.Now()); err != nil {
+		log.Fatalf("webui db migrate failed: %v", err)
+	}
+	webServer, err := webui.NewServer(cfg, webDB, writer, time.Now)
+	if err != nil {
+		log.Fatalf("webui init failed: %v", err)
+	}
+	if err := webServer.Start(); err != nil {
+		log.Fatalf("webui start failed: %v", err)
+	}
+	defer func() {
+		_ = webServer.Close()
 	}()
 
 	loop, err := app.NewLoop(cfg, writer, observability.ConsoleStageReporter{}, time.Now)
