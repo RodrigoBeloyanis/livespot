@@ -32,3 +32,10 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: Soak mode and readiness report
+DECISION: Add offline soak mode with mocked exchange and a deterministic readiness report (config_validated, audit_writer_ok, soak_pass).
+MOTIVATION: Stage 20 requires a long soak that validates liveness/health signals without network calls and a deterministic readiness summary.
+IMPACT: cmd\soak\main.go, internal\e2e\*, README.md, 10_OPERATIONS_RULES.md, 09_CODE_STRUCTURE.md
+RISKS / MITIGATIONS: Soak uses synthetic fixtures and cannot validate live exchange behavior; keep Live checklist and real audits mandatory for production.

@@ -203,6 +203,28 @@ Unit tests:
 Run:
 - go test ./... -count=1
 
+SOAK MODE + READINESS REPORT (STAGE 20)
+Goal: run a long offline soak with entries disabled, using a mocked exchange and deterministic fixtures.
+No network calls are made.
+
+Run (default 24h):
+```
+powershell
+go run .\cmd\soak --duration=24h --interval=1s --out var\soak\readiness.json
+```
+
+Readiness report (JSON):
+- ready: true only if all checks pass.
+- checks include:
+  - config_validated
+  - audit_writer_ok
+  - soak_pass (no LOOP_STUCK/WS_STALE/REST_STALE, no DB writer saturation, drift under thresholds)
+
+Soak output locations:
+- SQLite: var\soak\audit.sqlite
+- JSONL: var\soak\logs\
+- Report: var\soak\readiness.json (when --out is set)
+
 IMPORTANT NOTES
 - No Docker. No Testnet. LIVE only.
 - Secrets only in .env (or system environment variables). Never version .env.

@@ -40,6 +40,8 @@ CMD (BINARIES / TOOLS)
   Responsibility: diagnostics (keys, WS/REST, permissions, DB, filters, clock).
 - cmd\experiments\main.go
   Responsibility: run parameter grids, measure metrics, and persist results.
+- cmd\soak\main.go
+  Responsibility: run the 24h soak harness and emit readiness report (mocked exchange, entries disabled).
 
 INTERNAL\APP (ORCHESTRATION)
 - internal\app\app.go
@@ -202,6 +204,14 @@ INTERNAL\OBSERVABILITY
   Responsibility: fixed loop stage catalog and helpers for console/JSONL.
 - internal\observability\metrics.go
   Responsibility: basic process metrics for the web panel.
+
+INTERNAL\E2E (SOAK AND READINESS)
+- internal\e2e\pipeline.go
+  Responsibility: deterministic end-to-end harness with mocked exchange, entries disabled for soak.
+- internal\e2e\mock_exchange.go
+  Responsibility: in-memory exchange mock used by E2E tests.
+- internal\e2e\soak.go
+  Responsibility: soak runner and readiness report.
 
 PROMPTS
 - prompts\ai_gate_system.txt

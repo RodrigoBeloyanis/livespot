@@ -292,6 +292,7 @@ BACKUP AND RETENTION
 OPERATION TOOLS
 - cmd\doctor: diagnose WS/REST/DB/filters/clock.
 - cmd\experiments: offline analysis and parameter evaluation; MUST NOT run while Live execution is enabled.
+- cmd\soak: offline soak harness with mocked exchange and entries disabled; emits readiness report.
 
 HEALTH SIGNALS (WHAT TO WATCH)
 - WS reconnect rate
@@ -304,6 +305,27 @@ HEALTH SIGNALS (WHAT TO WATCH)
 - volume of BLOCKs by EDGE_TOO_LOW/COST_TOO_HIGH
 - volume of AIGATE_TIMEOUT / AIGATE_SCHEMA_INVALID / AIGATE_PARSE_FAIL / AIGATE_MODIFY_INVALID / AIGATE_REASON_UNKNOWN
 - average AIGATE_CALL time (latency) and variance
+
+SOAK MODE (OFFLINE, MOCKED, ENTRIES DISABLED)
+Goal: run a long offline soak without network calls and produce a readiness report.
+This mode is for regression and liveness checks only; it does not place orders.
+
+Rules:
+- uses a mocked exchange client and deterministic fixtures.
+- entries are disabled (no order submits).
+- output is written to a dedicated var\soak directory (SQLite + JSONL).
+
+Readiness report checks:
+- config_validated: config validation passes.
+- audit_writer_ok: audit writer is created and writes events.
+- soak_pass: no violations during the run.
+
+Soak pass criteria:
+- loop_stuck: now_ms - last_progress_ts_ms < loop_stuck_ms_degrade
+- ws_stale: now_ms - ws_last_msg_ts_ms < ws_stale_ms_degrade
+- rest_stale: now_ms - rest_last_ok_ts_ms < rest_stale_ms_degrade
+- db_writer saturation: db_writer_queue_pct < audit_writer_queue_full_pct
+- reconcile drift: drift_score_x10000 < reconcile_drift_degrade_x10000
 
 WEB PANEL (OPERATIONAL USE)
 - by default, the bot exposes a local panel at:
