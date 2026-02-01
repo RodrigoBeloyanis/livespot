@@ -32,3 +32,17 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: Decision/order intent ID prefixes
+DECISION: Use decision_id prefix "dec_" and order_intent_id prefix "oi_" with SHA-256 hex of canonical payloads.
+MOTIVATION: Contract requires deterministic IDs but does not specify prefix format; this keeps IDs URL-safe and readable.
+IMPACT: internal\engine\executor\intent_id.go, internal\engine\strategy\strategy.go
+RISKS / MITIGATIONS: If a different prefix format is mandated later, update builders and record a migration plan.
+
+DATE: 2026-02-01
+TOPIC: Deterministic client_order_id derivation for TP/SL
+DECISION: Derive TP/SL client_order_id from order_intent_id with suffixes "_TP" and "_SL" before base32 hashing.
+MOTIVATION: Contract requires deterministic IDs for protection orders but does not specify a derivation for TP/SL.
+IMPACT: internal\engine\executor\intent_id.go, internal\engine\strategy\strategy.go
+RISKS / MITIGATIONS: If execution policy mandates a different derivation, update the derivation and record the change.
