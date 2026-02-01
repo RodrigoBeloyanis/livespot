@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"time"
@@ -38,5 +39,7 @@ func main() {
 		return
 	}
 
-	log.Printf("no execution mode implemented yet; use --dry-run")
+	if err := loop.Run(context.Background()); err != nil {
+		log.Fatalf("loop failed: %v", err)
+	}
 }
