@@ -204,6 +204,20 @@ Stage 07 — Doctor checks + troubleshooting docs
 
 ---
 
+## 5.1) Decision + AI Gate scope checklist (when requested by user)
+Scope: decision pipeline and AI decision only. Do not implement order execution.
+
+- [ ] Map contracts and required rules (01, 02, 03, 04, 05, 06, 07, 10)
+- [ ] Implement Snapshot builder + validation + canonical hash
+- [ ] Implement Strategy -> Decision with reason_codes
+- [ ] Implement Risk -> RiskVerdict with reason_codes
+- [ ] Implement AI Gate (AIGATE_CALL): strict schema, redaction, canonical hashes, conservative MODIFY
+- [ ] Integrate loop stages: STRATEGY_PROPOSE -> AIGATE_CALL -> RISK_VERDICT (no EXECUTE_INTENT)
+- [ ] Audit events for Snapshot/Decision/AIGate/Risk (SQLite + JSONL)
+- [ ] Deterministic tests + `go test ./...` + `go vet ./...`
+
+---
+
 ## 6) Required checklists (print every stage)
 ### 6.1 Pre-commit checklist
 - [ ] Stage scope implemented only (no future-stage work)
