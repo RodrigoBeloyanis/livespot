@@ -38,12 +38,26 @@ DATE: 2026-02-01
 TOPIC: Binance WS base URL default
 DECISION: Use wss://stream.binance.com:9443 as the default WS base URL when none is provided.
 MOTIVATION: Required to implement Stage 10 WS subscriptions; no higher-priority document specifies a base URL.
-IMPACT: internal\infra\binance\ws.go
+IMPACT: internal\\infra\\binance\\ws.go
 RISKS / MITIGATIONS: If the official WS endpoint changes or regional endpoints are required, pass a different BaseURL via client options and record the change here.
 
 DATE: 2026-02-01
 TOPIC: Binance REST base URL default
 DECISION: Use https://api.binance.com as the default REST base URL when none is provided.
 MOTIVATION: Required to implement the Stage 09 REST client; no higher-priority document specifies a base URL.
-IMPACT: internal\infra\binance\rest.go
+IMPACT: internal\\infra\\binance\\rest.go
 RISKS / MITIGATIONS: If the official base URL changes or regional endpoints are required, pass a different BaseURL via client options and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Snapshot persistence table
+DECISION: Add snapshots table with snapshot_json storage keyed by snapshot_id.
+MOTIVATION: Stage 11 requires snapshot persistence for audit reconstruction; schema details were not specified.
+IMPACT: migrations/0002_snapshots.sql
+RISKS / MITIGATIONS: If query needs expand (cycle_id/run_id) or payload size becomes an issue, evolve schema with a new migration and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Snapshot timestamp bounds scope
+DECISION: Apply rest_stale_ms_pause/time_sync_recv_window_ms bounds to snapshot-level timestamps (metadata, market_24h, returns_series), not historical candle timestamps.
+MOTIVATION: Candle timestamps are intentionally historical and would always violate a 60s staleness window; the spec does not clarify scope.
+IMPACT: internal\\engine\\state\\snapshot_validator.go
+RISKS / MITIGATIONS: If a stricter policy is required, update validator to include candles and adjust config; log the change here.
