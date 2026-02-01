@@ -1,8 +1,8 @@
-livespot (Binance Spot 24/7, LIVE only)
+﻿livespot (Binance Spot 24/7, LIVE only)
 
 PURPOSE OF THIS FILE
 This README is a usage manual: overview, prerequisites, how to run LIVE, and where to debug.
-It is NOT the law of the system. Rules and contracts live in files 00–12.
+It is NOT the law of the system. Rules and contracts live in files 00â€“12.
 
 PROJECT LOCATION (WINDOWS 11)
 C:\go\livespot
@@ -214,6 +214,10 @@ IMPORTANT NOTES
 TROUBLESHOOTING BY SYMPTOMS
 The goal is deterministic triage: symptom -> detection -> action -> expected result.
 
+Doctor checks
+- Run go run .\\cmd\\doctor to verify config, LIVE locks, audit sinks, filesystem permissions, and SQLite availability.
+- Any FAIL means the system must remain in PAUSE or DEGRADE until resolved.
+
 1) Symptom: SYS MODE stuck in DEGRADE or PAUSE
 - Detect:
   - Web panel header: SYS MODE=DEGRADE|PAUSE and active reason_codes
@@ -322,7 +326,7 @@ TABS (BELOW THE FOLD)
 DRILLDOWN (ONE DECISION / ONE POSITION)
 When clicking a decision_id (or order_intent_id), the panel must open a drawer with a human-readable trace:
 - Snapshot refs + regime/microstructure
-- Decision (edge/plan) → AIGateResult → RiskVerdict → intents → orders/fills → reconcile diffs
+- Decision (edge/plan) â†’ AIGateResult â†’ RiskVerdict â†’ intents â†’ orders/fills â†’ reconcile diffs
 
 HOW TO USE THE PANEL TO OPERATE 24/7 (FIXED ORDER)
 1) Check header: SYS MODE, active reason_codes, and since_ms.
