@@ -32,3 +32,24 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: Stage 12 ranking normalization defaults
+DECISION: Normalize ranking components by max value in the eligible set (volume, momentum) and invert spread by max spread in the set for score calculations.
+MOTIVATION: Stage 12 required weights and thresholds but did not specify normalization; this provides deterministic, scale-free scoring.
+IMPACT: internal\engine\rank\topn.go
+RISKS / MITIGATIONS: If a fixed scale or alternative normalization is required, update the ranking function and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Stage 12 eligibility rules default
+DECISION: Eligibility requires symbol_status=TRADING, filters_ok=true, ws_ok=true, not quarantined, and Market24h thresholds (volume, trades, price_change).
+MOTIVATION: Health flags are present in the Snapshot spec but eligibility rules were not explicit; these are conservative safety defaults.
+IMPACT: internal\engine\universe\scan.go
+RISKS / MITIGATIONS: If eligibility should be looser or based on different signals, update rules and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Stage 12 deep-scan edge estimate
+DECISION: Estimate edge_bps using atr14_5m_bps minus (spread_current_bps + maker+taker fees + entry/exit slippage).
+MOTIVATION: Deep-scan weights included an edge component but no deterministic formula was specified for Stage 12.
+IMPACT: internal\engine\deepscan\deepscan.go
+RISKS / MITIGATIONS: Replace with the Strategy edge_bps_expected when available and record the change here.
