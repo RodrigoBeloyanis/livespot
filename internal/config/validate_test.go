@@ -37,6 +37,24 @@ func TestValidateInvalidQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestValidateWebuiLimits(t *testing.T) {
+	cfg := Default()
+	cfg.WebuiIntentsRecentLimit = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for webui_intents_recent_limit")
+	}
+	cfg = Default()
+	cfg.WebuiReconcileDiffsRecentLimit = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for webui_reconcile_diffs_recent_limit")
+	}
+	cfg = Default()
+	cfg.WebuiMarketSymbolsLimit = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for webui_market_symbols_limit")
+	}
+}
+
 func TestValidateLiveOKFileMissing(t *testing.T) {
 	cfg := Default()
 	cfg.LiveRequireOKFile = true

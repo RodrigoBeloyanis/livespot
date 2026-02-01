@@ -32,3 +32,10 @@ DECISION: Add audit_writer_queue_capacity=1024 to config defaults and set SQLite
 MOTIVATION: Audit sink requires a bounded queue for backpressure and a configured busy_timeout; no explicit values were specified in higher-priority docs.
 IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md, internal\infra\sqlite\db.go
 RISKS / MITIGATIONS: Capacity too small may trigger PAUSE under load; adjust via config defaults with a logged decision if needed.
+
+DATE: 2026-02-01
+TOPIC: WebUI list limits
+DECISION: Add webui_intents_recent_limit=50, webui_reconcile_diffs_recent_limit=50, and webui_market_symbols_limit=50 to config defaults and 00_SOURCE_OF_TRUTH.md.
+MOTIVATION: 08_SYSTEM_ARCHITECTURE.md defines bounded list sizes for the dashboard and requires defaults in config.
+IMPACT: internal\config\config.go, internal\config\validate.go, internal\config\validate_test.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: If the dashboard needs more rows, increase limits and revalidate performance.

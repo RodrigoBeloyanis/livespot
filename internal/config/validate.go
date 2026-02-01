@@ -92,6 +92,15 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("webui_stream_snapshot_interval_ms", cfg.WebuiStreamSnapshotIntervalMs); err != nil {
 		return err
 	}
+	if err := requireRange("webui_intents_recent_limit", cfg.WebuiIntentsRecentLimit, 10, 200); err != nil {
+		return err
+	}
+	if err := requireRange("webui_reconcile_diffs_recent_limit", cfg.WebuiReconcileDiffsRecentLimit, 10, 200); err != nil {
+		return err
+	}
+	if err := requireRange("webui_market_symbols_limit", cfg.WebuiMarketSymbolsLimit, 10, 200); err != nil {
+		return err
+	}
 	if err := requirePositiveInt("time_sync_recv_window_ms", cfg.TimeSyncRecvWindowMs); err != nil {
 		return err
 	}
@@ -137,6 +146,13 @@ func requirePct(field string, v int) error {
 func requirePort(field string, v int) error {
 	if v < 1 || v > 65535 {
 		return ValidationError{Field: field, Message: "must be in [1..65535]"}
+	}
+	return nil
+}
+
+func requireRange(field string, v int, min int, max int) error {
+	if v < min || v > max {
+		return ValidationError{Field: field, Message: fmt.Sprintf("must be in [%d..%d]", min, max)}
 	}
 	return nil
 }
