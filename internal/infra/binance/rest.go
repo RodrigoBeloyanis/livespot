@@ -168,6 +168,10 @@ func (c *Client) CancelReplaceOrder(ctx context.Context, params url.Values) (JSO
 	return c.doRequest(ctx, http.MethodPost, "/api/v3/order/cancelReplace", params, true, 1, true)
 }
 
+func (c *Client) NewOCO(ctx context.Context, params url.Values) (JSONResponse, error) {
+	return c.doRequest(ctx, http.MethodPost, "/api/v3/order/oco", params, true, 1, true)
+}
+
 func (c *Client) OpenOrders(ctx context.Context, params url.Values) (JSONResponse, error) {
 	return c.doRequest(ctx, http.MethodGet, "/api/v3/openOrders", params, true, 1, false)
 }

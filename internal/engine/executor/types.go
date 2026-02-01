@@ -46,6 +46,26 @@ type CancelReplaceRequest struct {
 	TimeInForce   contracts.TimeInForce
 }
 
+type OCORequest struct {
+	Symbol             string
+	Side               contracts.Side
+	Qty                string
+	TPPrice            string
+	SLStopPrice        string
+	SLStopLimitPrice   string
+	SLStopLimitTIF     contracts.TimeInForce
+	ListClientOrderID  string
+	LimitClientOrderID string
+	StopClientOrderID  string
+}
+
+type OCOResponse struct {
+	Rejected        bool
+	OrderListID     string
+	ListClientID    string
+	Status          string
+}
+
 type PriceFilter struct {
 	MinPrice string
 	MaxPrice string

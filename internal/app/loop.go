@@ -42,6 +42,7 @@ type Loop struct {
 	ledger   *executor.LedgerService
 	orderClient executor.OrderRestClient
 	intentLookup executor.RestClient
+	ocoClient executor.OCOClient
 	selectionStore *persist.SelectionStore
 	prevTopK []string
 	cyclesSincePrev int
@@ -57,7 +58,7 @@ type Loop struct {
 	forceExit         bool
 }
 
-func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate, orderClient executor.OrderRestClient, intentLookup executor.RestClient) (*Loop, error) {
+func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate, orderClient executor.OrderRestClient, intentLookup executor.RestClient, ocoClient executor.OCOClient) (*Loop, error) {
 	if writer == nil {
 		return nil, fmt.Errorf("audit writer missing")
 	}
@@ -82,6 +83,7 @@ func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.Sta
 		ledger:       ledger,
 		orderClient:  orderClient,
 		intentLookup: intentLookup,
+		ocoClient:    ocoClient,
 		selectionStore: persist.NewSelectionStore(db),
 	}, nil
 }
@@ -321,6 +323,17 @@ func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error
 				return err
 			}
 			if err := l.emitOrderSubmit(runID, cycleID, decision, intentID, resp, reason); err != nil {
+				return err
+			}
+			if l.ocoClient == nil {
+				return fmt.Errorf("protection deps missing")
+			}
+			ocoResp, ocoIntentID, ocoReason, err := executor.ExecuteOCO(ctx, l.ledger, l.ocoClient, decision, bundle.Snapshot.Metadata.SnapshotHash, runID, cycleID, l.now())
+			if err != nil {
+				_ = l.emitProtectionSubmit(runID, cycleID, decision, ocoIntentID, ocoResp, ocoReason)
+				return err
+			}
+			if err := l.emitProtectionSubmit(runID, cycleID, decision, ocoIntentID, ocoResp, ocoReason); err != nil {
 				return err
 			}
 		}
@@ -642,6 +655,41 @@ func (l *Loop) emitOrderSubmit(runID string, cycleID string, decision contracts.
 	}
 	if err := l.writer.Write(record); err != nil {
 		return fmt.Errorf("audit order submit write: %w", err)
+	}
+	return nil
+}
+
+func (l *Loop) emitProtectionSubmit(runID string, cycleID string, decision contracts.Decision, intentID string, resp executor.OCOResponse, reason reasoncodes.ReasonCode) error {
+	now := l.now()
+	reasons := []reasoncodes.ReasonCode{}
+	if reason != "" {
+		reasons = append(reasons, reason)
+	}
+	record := audit.Record{
+		Event: auditdomain.AuditEvent{
+			TsMs:            now.UnixMilli(),
+			RunID:           runID,
+			CycleID:         cycleID,
+			Mode:            l.cfg.Mode,
+			Stage:           observability.POSITION_MANAGE,
+			EventType:       auditdomain.ORDER_SUBMIT,
+			Reasons:         reasons,
+			SnapshotID:      decision.SnapshotID,
+			DecisionID:      decision.DecisionID,
+			OrderIntentID:   intentID,
+			ExchangeTimeMs:  0,
+			LocalReceivedMs: now.UnixMilli(),
+		},
+		Data: map[string]any{
+			"symbol":        decision.Symbol,
+			"oco_list_id":   resp.OrderListID,
+			"client_list":   resp.ListClientID,
+			"status":        resp.Status,
+			"rejected":      resp.Rejected,
+		},
+	}
+	if err := l.writer.Write(record); err != nil {
+		return fmt.Errorf("audit protection submit write: %w", err)
 	}
 	return nil
 }

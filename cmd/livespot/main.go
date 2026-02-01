@@ -112,7 +112,7 @@ func main() {
 	}
 	reporter := observability.NewThrottledStageReporter(15 * time.Second)
 	orderClient := executor.NewBinanceOrderClient(restClient)
-	loop, err := app.NewLoop(cfg, writer, reporter, time.Now, webDB, provider, gate, orderClient, orderClient)
+	loop, err := app.NewLoop(cfg, writer, reporter, time.Now, webDB, provider, gate, orderClient, orderClient, orderClient)
 	if err != nil {
 		log.Fatalf("loop init failed: %v", err)
 	}

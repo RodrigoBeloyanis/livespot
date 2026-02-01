@@ -63,6 +63,31 @@ func (b *BinanceOrderClient) CancelReplaceOrder(ctx context.Context, req CancelR
 	return parseOrderResponse(resp.Body)
 }
 
+func (b *BinanceOrderClient) SubmitOCO(ctx context.Context, req OCORequest) (OCOResponse, error) {
+	params := url.Values{}
+	params.Set("symbol", req.Symbol)
+	params.Set("side", string(req.Side))
+	params.Set("quantity", req.Qty)
+	params.Set("price", req.TPPrice)
+	params.Set("stopPrice", req.SLStopPrice)
+	params.Set("stopLimitPrice", req.SLStopLimitPrice)
+	params.Set("stopLimitTimeInForce", string(req.SLStopLimitTIF))
+	if req.ListClientOrderID != "" {
+		params.Set("listClientOrderId", req.ListClientOrderID)
+	}
+	if req.LimitClientOrderID != "" {
+		params.Set("limitClientOrderId", req.LimitClientOrderID)
+	}
+	if req.StopClientOrderID != "" {
+		params.Set("stopClientOrderId", req.StopClientOrderID)
+	}
+	resp, err := b.client.NewOCO(ctx, params)
+	if err != nil {
+		return OCOResponse{}, err
+	}
+	return parseOCOResponse(resp.Body)
+}
+
 func (b *BinanceOrderClient) GetOrderByClientID(ctx context.Context, symbol string, clientOrderID string) (OrderResponse, error) {
 	params := url.Values{}
 	params.Set("symbol", symbol)
@@ -88,6 +113,12 @@ type binanceOrderAck struct {
 	Status        string `json:"status"`
 }
 
+type binanceOCOAck struct {
+	OrderListID      int64  `json:"orderListId"`
+	ListClientOrderID string `json:"listClientOrderId"`
+	ListOrderStatus  string `json:"listOrderStatus"`
+}
+
 func parseOrderResponse(body []byte) (OrderResponse, error) {
 	var ack binanceOrderAck
 	if err := json.Unmarshal(body, &ack); err != nil {
@@ -99,6 +130,20 @@ func parseOrderResponse(body []byte) (OrderResponse, error) {
 		OrderID:       fmt.Sprintf("%d", ack.OrderID),
 		ClientOrderID: ack.ClientOrderID,
 		Status:        ack.Status,
+	}
+	return resp, nil
+}
+
+func parseOCOResponse(body []byte) (OCOResponse, error) {
+	var ack binanceOCOAck
+	if err := json.Unmarshal(body, &ack); err != nil {
+		return OCOResponse{}, fmt.Errorf("oco decode: %w", err)
+	}
+	resp := OCOResponse{
+		Rejected:     strings.EqualFold(ack.ListOrderStatus, "REJECTED"),
+		OrderListID:  fmt.Sprintf("%d", ack.OrderListID),
+		ListClientID: ack.ListClientOrderID,
+		Status:       ack.ListOrderStatus,
 	}
 	return resp, nil
 }

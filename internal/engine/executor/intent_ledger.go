@@ -26,6 +26,7 @@ const (
 	IntentActionNewOrder      IntentAction = "NEW_ORDER"
 	IntentActionCancelOrder   IntentAction = "CANCEL_ORDER"
 	IntentActionCancelReplace IntentAction = "CANCEL_REPLACE"
+	IntentActionOCOCreate     IntentAction = "OCO_CREATE"
 )
 
 type LedgerService struct {
