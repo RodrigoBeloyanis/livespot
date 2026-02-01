@@ -14,6 +14,21 @@ type PositionSize struct {
 	Quote *big.Rat
 }
 
+type SizeResult struct {
+	QtyBase   string
+	QuoteUSDT string
+}
+
+func CalculatePositionSize(entryPrice string, stopPrice string, riskPerTrade string, constraints contracts.DecisionConstraints) (SizeResult, error) {
+	size, err := computePositionSize(entryPrice, stopPrice, riskPerTrade, constraints)
+	if err != nil {
+		return SizeResult{}, err
+	}
+	qty := ratToString(size.Base, decimalPlaces(constraints.StepSize))
+	quote := ratToString(size.Quote, 2)
+	return SizeResult{QtyBase: qty, QuoteUSDT: quote}, nil
+}
+
 func ValidatePositionSizing(cfg config.Config, decision contracts.Decision) (reasoncodes.ReasonCode, *PositionSize, error) {
 	if decision.EntryPlan == nil || decision.ExitPlan == nil {
 		return reasoncodes.STRAT_INPUT_INVALID, nil, fmt.Errorf("entry/exit plan missing")

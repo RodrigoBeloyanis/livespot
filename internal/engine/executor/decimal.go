@@ -50,6 +50,22 @@ func ratToString(r *big.Rat, precision int) string {
 	return r.FloatString(precision)
 }
 
+func QuantizePrice(price string, tickSize string) (string, error) {
+	priceRat, err := parseDecimalStrict(price)
+	if err != nil {
+		return "", err
+	}
+	tick, err := parseDecimalStrict(tickSize)
+	if err != nil {
+		return "", err
+	}
+	quantized, err := quantizeDown(priceRat, tick)
+	if err != nil {
+		return "", err
+	}
+	return ratToString(quantized, decimalPlaces(tickSize)), nil
+}
+
 func isStepAligned(value int, step int) bool {
 	if step <= 0 {
 		return false
