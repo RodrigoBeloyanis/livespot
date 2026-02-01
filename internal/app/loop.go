@@ -29,6 +29,10 @@ func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.Sta
 }
 
 func (l *Loop) RunDryRun() error {
+	sequence := DefaultStageSequence()
+	if err := sequence.Validate(); err != nil {
+		return err
+	}
 	runID, err := observability.NewRunID(l.now())
 	if err != nil {
 		return err
@@ -37,23 +41,7 @@ func (l *Loop) RunDryRun() error {
 	if err != nil {
 		return err
 	}
-	stages := []observability.StageName{
-		observability.BOOT,
-		observability.UNIVERSE_SCAN,
-		observability.RANK_TOPN,
-		observability.DEEP_SCAN,
-		observability.WATCHLIST_ATTACH,
-		observability.STATE_UPDATE,
-		observability.STRATEGY_PROPOSE,
-		observability.AIGATE_CALL,
-		observability.RISK_VERDICT,
-		observability.EXECUTE_INTENT,
-		observability.POSITION_MANAGE,
-		observability.RECONCILE_REST,
-		observability.REPORT_DAILY_SUMMARY,
-		observability.SHUTDOWN,
-	}
-	for _, stage := range stages {
+	for _, stage := range sequence.Stages {
 		if err := l.emitStage(runID, cycleID, stage, "", "dry-run"); err != nil {
 			return err
 		}

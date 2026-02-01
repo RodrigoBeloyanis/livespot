@@ -42,7 +42,8 @@ func TestRunDryRunEmitsStageEvents(t *testing.T) {
 	if err := db.QueryRow("SELECT COUNT(*) FROM audit_events WHERE event_type='STAGE_CHANGED'").Scan(&count); err != nil {
 		t.Fatalf("count stage events: %v", err)
 	}
-	if count == 0 {
-		t.Fatalf("expected stage events")
+	expected := len(DefaultStageSequence().Stages)
+	if count != expected {
+		t.Fatalf("expected %d stage events, got %d", expected, count)
 	}
 }
