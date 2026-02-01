@@ -196,6 +196,43 @@ Verification source: internal\config\config.go (Config struct / defaults).
 - clock_drift_max_ms_paper: 2000 (2 seconds)
 - disk_health_sample_interval_ms: 5000 (5 seconds)
 - audit_redacted_json_max_bytes: 4096 (4 KB)
+- strategy_min_edge_bps: 15 (bps)
+- strategy_min_edge_bps_fallback: 20 (bps)
+- risk_per_trade_usdt: 100.00 (USDT)
+- risk_per_trade_min_usdt: 10.00 (USDT)
+- risk_per_trade_max_usdt: 500.00 (USDT)
+- risk_max_exposure_symbol_usdt: 200.00 (USDT)
+- risk_max_exposure_total_usdt: 500.00 (USDT)
+- risk_max_daily_loss_usdt: -500.00 (USDT)
+- risk_max_drawdown_usdt: 500.00 (USDT)
+- risk_max_open_orders_per_symbol: 1
+- risk_max_open_orders_total: 10
+- risk_max_trades_per_day: 20
+- risk_trades_window_seconds: 3600 (1 hour)
+- risk_max_trades_per_window: 3
+- risk_cooldown_seconds: 300 (5 minutes)
+- risk_max_consecutive_losses: 3
+- risk_ws_latency_threshold_ms: 1000
+- risk_adaptive_spread_factor_x10000: 15000
+- risk_adaptive_volatility_factor_x10000: 15000
+- risk_adaptive_liquidity_floor_x10000: 5000
+- risk_adaptive_max_multiplier_x10000: 30000
+- risk_adaptive_normal_atr_5m_bps: 50
+- risk_churn_max_cancel_replace_10s: 3
+- risk_churn_max_cancel_10s: 5
+- risk_churn_max_new_orders_10s: 5
+- risk_churn_cooldown_seconds: 60
+- risk_churn_unfilled_order_warning_pct: 80
+- risk_churn_unfilled_order_critical_pct: 95
+- risk_quarantine_max_rejects_per_hour: 3
+- risk_quarantine_max_ws_disconnects_per_10min: 5
+- risk_quarantine_max_timeouts_consecutive: 3
+- risk_quarantine_ttl_seconds: 3600
+- risk_quarantine_auto_release: true
+- corr_max_x10000: 8500
+- corr_window_points: 72
+- corr_missing_max_pct: 10
+- corr_min_symbols_for_check: 3
 
 Rule: If any of these fields is missing at boot, the system must enter PAUSE with reason_code STRAT_CONFIG_INVALID.
 
