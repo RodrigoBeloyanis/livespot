@@ -96,3 +96,24 @@ DECISION: Derive TP/SL client_order_id from order_intent_id with suffixes "_TP" 
 MOTIVATION: Contract requires deterministic IDs for protection orders but does not specify a derivation for TP/SL.
 IMPACT: internal\\engine\\executor\\intent_id.go, internal\\engine\\strategy\\strategy.go
 RISKS / MITIGATIONS: If execution policy mandates a different derivation, update the derivation and record the change.
+
+DATE: 2026-02-01
+TOPIC: Strategy/risk defaults and correlation thresholds
+DECISION: Add strategy_min_edge_bps=15, strategy_min_edge_bps_fallback=20, and Stage 14 risk defaults (risk_per_trade, exposure, adaptive, churn, quarantine, corr thresholds) to config defaults and 00_SOURCE_OF_TRUTH.md.
+MOTIVATION: 03_STRATEGY.md and 04_RISK_ENGINE_RULES.md require explicit deterministic defaults in config.go; 00_SOURCE_OF_TRUTH mandates mirroring defaults there.
+IMPACT: internal\\config\\config.go, internal\\config\\validate.go, internal\\config\\validate_test.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: Defaults may need tuning after live observation; any change must update 00_SOURCE_OF_TRUTH.md and be logged here.
+
+DATE: 2026-02-01
+TOPIC: Drawdown unit alignment
+DECISION: Implement drawdown limits in USDT (max_drawdown_usdt) to align with RiskLimitsSnapshot contract fields, despite 04_RISK_ENGINE_RULES.md describing percent drawdown.
+MOTIVATION: 01_DECISION_CONTRACT.md defines MaxDrawdownUSDT, which is higher authority than 04_RISK_ENGINE_RULES.md; preserving contract avoids schema change in Stage 14.
+IMPACT: internal\\engine\\risk\\engine.go, internal\\config\\config.go, 00_SOURCE_OF_TRUTH.md
+RISKS / MITIGATIONS: If percentage drawdown is required later, add a new field with a formal contract update and migration; keep USDT field for backward compatibility.
+
+DATE: 2026-02-01
+TOPIC: Soak mode and readiness report
+DECISION: Add offline soak mode with mocked exchange and a deterministic readiness report (config_validated, audit_writer_ok, soak_pass).
+MOTIVATION: Stage 20 requires a long soak that validates liveness/health signals without network calls and a deterministic readiness summary.
+IMPACT: cmd\soak\main.go, internal\e2e\*, README.md, 10_OPERATIONS_RULES.md, 09_CODE_STRUCTURE.md
+RISKS / MITIGATIONS: Soak uses synthetic fixtures and cannot validate live exchange behavior; keep Live checklist and real audits mandatory for production.

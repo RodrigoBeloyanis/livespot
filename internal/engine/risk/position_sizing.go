@@ -4,73 +4,143 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/RodrigoBeloyanis/livespot/internal/config"
 	"github.com/RodrigoBeloyanis/livespot/internal/domain/contracts"
-	"github.com/RodrigoBeloyanis/livespot/internal/engine/executor"
+	"github.com/RodrigoBeloyanis/livespot/internal/domain/reasoncodes"
 )
 
-type SizeResult struct {
-	QtyBase   string
-	QuoteUSDT string
+type PositionSize struct {
+	Base  *big.Rat
+	Quote *big.Rat
 }
 
-func CalculatePositionSize(entryPrice string, stopPrice string, riskPerTrade string, constraints contracts.DecisionConstraints) (SizeResult, error) {
-	entry, err := parseDecimal(entryPrice)
+func ValidatePositionSizing(cfg config.Config, decision contracts.Decision) (reasoncodes.ReasonCode, *PositionSize, error) {
+	if decision.EntryPlan == nil || decision.ExitPlan == nil {
+		return reasoncodes.STRAT_INPUT_INVALID, nil, fmt.Errorf("entry/exit plan missing")
+	}
+	entryPrice := decision.EntryPlan.LimitPrice
+	if entryPrice == "" {
+		entryPrice = decision.EntryPlan.DesiredPrice
+	}
+	stopPrice := decision.ExitPlan.SLPrice
+	if entryPrice == "" || stopPrice == "" {
+		return reasoncodes.STRAT_INPUT_INVALID, nil, fmt.Errorf("entry/stop price missing")
+	}
+	riskValue, err := truncateDecimalString(cfg.RiskPerTradeUSDT, 2)
 	if err != nil {
-		return SizeResult{}, err
+		return reasoncodes.STRAT_INPUT_INVALID, nil, err
 	}
-	stop, err := parseDecimal(stopPrice)
+	size, err := computePositionSize(entryPrice, stopPrice, riskValue, decision.Constraints)
 	if err != nil {
-		return SizeResult{}, err
+		switch err.Error() {
+		case "min_notional":
+			return reasoncodes.PROTECTION_INVALID_MIN_NOTIONAL, nil, nil
+		case "filters":
+			return reasoncodes.PROTECTION_INVALID_FILTER, nil, nil
+		case "size_invalid":
+			return reasoncodes.RISK_SIZE_INVALID, nil, nil
+		default:
+			return reasoncodes.STRAT_INPUT_INVALID, nil, err
+		}
 	}
-	risk, err := parseDecimal(riskPerTrade)
+	entryQty, err := parseDecimalStrict(decision.EntryPlan.Qty)
 	if err != nil {
-		return SizeResult{}, err
+		return reasoncodes.STRAT_INPUT_INVALID, nil, err
 	}
-	if entry.Sign() <= 0 {
-		return SizeResult{}, fmt.Errorf("entry price invalid")
+	if entryQty.Sign() <= 0 {
+		return reasoncodes.RISK_SIZE_INVALID, nil, nil
 	}
-	diff := new(big.Rat).Sub(entry, stop)
-	if diff.Sign() < 0 {
-		diff.Neg(diff)
+	if entryQty.Cmp(size.Base) > 0 {
+		return reasoncodes.RISK_SIZE_INVALID, nil, nil
 	}
-	stopDistanceBps := new(big.Rat).Mul(new(big.Rat).Quo(diff, entry), big.NewRat(10000, 1))
-	if stopDistanceBps.Sign() <= 0 {
-		return SizeResult{}, fmt.Errorf("stop distance invalid")
-	}
-	sizeQuoteRaw := new(big.Rat).Quo(new(big.Rat).Mul(risk, big.NewRat(10000, 1)), stopDistanceBps)
-	sizeBaseRaw := new(big.Rat).Quo(sizeQuoteRaw, entry)
-	sizeBaseStr := sizeBaseRaw.FloatString(8)
-	priceQuantized, qtyQuantized, err := executor.QuantizeEntry(entryPrice, sizeBaseStr, constraints)
+	entryPriceRat, err := parseDecimalStrict(entryPrice)
 	if err != nil {
-		return SizeResult{}, err
+		return reasoncodes.STRAT_INPUT_INVALID, nil, err
 	}
-	quote, err := multiplyDecimal(qtyQuantized, priceQuantized)
+	minNotional, err := parseDecimalStrict(decision.Constraints.MinNotional)
 	if err != nil {
-		return SizeResult{}, err
+		return reasoncodes.STRAT_INPUT_INVALID, nil, err
 	}
-	return SizeResult{
-		QtyBase:   qtyQuantized,
-		QuoteUSDT: quote,
-	}, nil
+	entryNotional := new(big.Rat).Mul(entryQty, entryPriceRat)
+	if entryNotional.Cmp(minNotional) < 0 {
+		return reasoncodes.PROTECTION_INVALID_MIN_NOTIONAL, nil, nil
+	}
+	return "", size, nil
 }
 
-func parseDecimal(value string) (*big.Rat, error) {
-	r := new(big.Rat)
-	if _, ok := r.SetString(value); !ok {
-		return nil, fmt.Errorf("invalid decimal")
-	}
-	return r, nil
-}
-
-func multiplyDecimal(a string, b string) (string, error) {
-	ra, err := parseDecimal(a)
+func computePositionSize(entryPrice string, stopPrice string, riskPerTrade string, constraints contracts.DecisionConstraints) (*PositionSize, error) {
+	entry, err := parseDecimalStrict(entryPrice)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("filters")
 	}
-	rb, err := parseDecimal(b)
+	stop, err := parseDecimalStrict(stopPrice)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("filters")
 	}
-	out := new(big.Rat).Mul(ra, rb)
-	return out.FloatString(8), nil
+	risk, err := parseDecimalStrict(riskPerTrade)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	step, err := parseDecimalStrict(constraints.StepSize)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	minQty, err := parseDecimalStrict(constraints.MinQty)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	maxQty, err := parseDecimalStrict(constraints.MaxQty)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	minNotional, err := parseDecimalStrict(constraints.MinNotional)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	var maxNotional *big.Rat
+	if constraints.MaxNotional != "" {
+		maxNotional, err = parseDecimalStrict(constraints.MaxNotional)
+		if err != nil {
+			return nil, fmt.Errorf("filters")
+		}
+	}
+	if entry.Sign() <= 0 || risk.Sign() <= 0 {
+		return nil, fmt.Errorf("size_invalid")
+	}
+	stopDistance := new(big.Rat).Sub(entry, stop)
+	if stopDistance.Sign() < 0 {
+		stopDistance.Neg(stopDistance)
+	}
+	if stopDistance.Sign() == 0 {
+		return nil, fmt.Errorf("size_invalid")
+	}
+	stopDistance = new(big.Rat).Quo(stopDistance, entry)
+	stopDistance.Mul(stopDistance, big.NewRat(10000, 1))
+	if stopDistance.Sign() == 0 {
+		return nil, fmt.Errorf("size_invalid")
+	}
+	sizeQuote := new(big.Rat).Mul(risk, big.NewRat(10000, 1))
+	sizeQuote.Quo(sizeQuote, stopDistance)
+	if sizeQuote.Sign() <= 0 {
+		return nil, fmt.Errorf("size_invalid")
+	}
+	sizeBase := new(big.Rat).Quo(sizeQuote, entry)
+	quantized, err := quantizeDown(sizeBase, step)
+	if err != nil {
+		return nil, fmt.Errorf("filters")
+	}
+	if quantized.Sign() <= 0 {
+		return nil, fmt.Errorf("size_invalid")
+	}
+	if quantized.Cmp(minQty) < 0 || quantized.Cmp(maxQty) > 0 {
+		return nil, fmt.Errorf("filters")
+	}
+	sizeQuote = new(big.Rat).Mul(quantized, entry)
+	if sizeQuote.Cmp(minNotional) < 0 {
+		return nil, fmt.Errorf("min_notional")
+	}
+	if maxNotional != nil && sizeQuote.Cmp(maxNotional) > 0 {
+		return nil, fmt.Errorf("filters")
+	}
+	return &PositionSize{Base: quantized, Quote: sizeQuote}, nil
 }

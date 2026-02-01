@@ -37,12 +37,19 @@ func TestValidateInvalidQueueCapacity(t *testing.T) {
 	}
 }
 
-func TestValidateLiveOKFileMissing(t *testing.T) {
+func TestValidateStrategyMinEdgeFallback(t *testing.T) {
 	cfg := Default()
-	cfg.LiveRequireOKFile = true
-	cfg.LiveOKFilePath = filepath.Join(t.TempDir(), "LIVE.ok")
+	cfg.StrategyMinEdgeBpsFallback = cfg.StrategyMinEdgeBps - 1
 	if err := Validate(cfg, os.Stat); err == nil {
-		t.Fatalf("expected error for missing live ok file")
+		t.Fatalf("expected error for strategy_min_edge_bps_fallback")
+	}
+}
+
+func TestValidateCorrMaxX10000(t *testing.T) {
+	cfg := Default()
+	cfg.CorrMaxX10000 = 0
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for corr_max_x10000")
 	}
 }
 
@@ -62,5 +69,14 @@ func TestValidateStrategyWeightsSum(t *testing.T) {
 	cfg.StrategyWeightVolume = 0.0
 	if err := Validate(cfg, os.Stat); err == nil {
 		t.Fatalf("expected error for strategy weights sum")
+	}
+}
+
+func TestValidateLiveOKFileMissing(t *testing.T) {
+	cfg := Default()
+	cfg.LiveRequireOKFile = true
+	cfg.LiveOKFilePath = filepath.Join(t.TempDir(), "LIVE.ok")
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for missing live ok file")
 	}
 }
