@@ -20,7 +20,7 @@ L) 11_INVARIANTS_MAP.md (derived invariants map; does not create new rules)
 M) 12_DECISIONS_LOG.md (history and rationale; does not replace rules)
 
 AUXILIARY DOCUMENTS (NO NORMATIVE AUTHORITY)
-- README.md (operational usage manual; does not create rules, does not alter contracts, and never takes precedence over 00â€“12)
+- README.md (operational usage manual; does not create rules, does not alter contracts, and never takes precedence over 00–12)
 
 CONFLICT RULE
 - If a weaker document contradicts a stronger one: the stronger one prevails.
@@ -194,6 +194,7 @@ Verification source: internal\config\config.go (Config struct / defaults).
 - clock_drift_max_ms_live: 500 (0.5 seconds)
 - clock_drift_max_ms_paper: 2000 (2 seconds)
 - disk_health_sample_interval_ms: 5000 (5 seconds)
+- audit_redacted_json_max_bytes: 4096 (4 KB)
 
 Rule: If any of these fields is missing at boot, the system must enter PAUSE with reason_code STRAT_CONFIG_INVALID.
 
