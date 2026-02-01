@@ -105,6 +105,36 @@ func (c *Client) ExchangeInfo(ctx context.Context) (ExchangeInfo, error) {
 	return info, nil
 }
 
+func (c *Client) Ticker24hAll(ctx context.Context) ([]Ticker24h, error) {
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v3/ticker/24hr", url.Values{}, false, 40, false)
+	if err != nil {
+		return nil, err
+	}
+	tickers, err := ParseTicker24hAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ticker24h decode: %w", err)
+	}
+	return tickers, nil
+}
+
+func (c *Client) Klines(ctx context.Context, symbol string, interval string, limit int) ([]Kline, error) {
+	params := url.Values{}
+	params.Set("symbol", symbol)
+	params.Set("interval", interval)
+	if limit > 0 {
+		params.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v3/klines", params, false, 2, false)
+	if err != nil {
+		return nil, err
+	}
+	klines, err := ParseKlines(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("klines decode: %w", err)
+	}
+	return klines, nil
+}
+
 func (c *Client) Depth(ctx context.Context, symbol string, limit int) (DepthResponse, error) {
 	params := url.Values{}
 	params.Set("symbol", symbol)

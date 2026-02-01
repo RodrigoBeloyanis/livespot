@@ -106,6 +106,77 @@ FROM order_intents WHERE state = ? ORDER BY updated_at_ms ASC LIMIT ?`, state, l
 	return out, nil
 }
 
+type SnapshotRecord struct {
+	SnapshotID     string
+	Symbol         string
+	SnapshotHash   string
+	ExchangeTimeMs int64
+	LocalReceivedMs int64
+	SnapshotJSON   string
+	CreatedAtMs    int64
+}
+
+func InsertSnapshot(ctx context.Context, db *sql.DB, rec SnapshotRecord) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO snapshots (
+  snapshot_id, symbol, snapshot_hash, exchange_time_ms, local_received_ms, snapshot_json, created_at_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		rec.SnapshotID,
+		rec.Symbol,
+		rec.SnapshotHash,
+		rec.ExchangeTimeMs,
+		rec.LocalReceivedMs,
+		rec.SnapshotJSON,
+		rec.CreatedAtMs,
+	)
+	if err != nil {
+		return fmt.Errorf("insert snapshot: %w", err)
+	}
+	return nil
+}
+
+type DecisionRecord struct {
+	DecisionID     string
+	RunID          string
+	CycleID        string
+	SnapshotID     string
+	Symbol         string
+	Stage          string
+	Intent         string
+	RiskVerdict    string
+	ReasonsJSON    string
+	RiskReasonsJSON string
+	AIVerdict      string
+	AIReasonsJSON  string
+	DecisionJSON   string
+	CreatedAtMs    int64
+}
+
+func InsertDecision(ctx context.Context, db *sql.DB, rec DecisionRecord) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO decisions (
+  decision_id, run_id, cycle_id, snapshot_id, symbol, stage, intent, risk_verdict, reasons_json,
+  risk_reasons_json, ai_verdict, ai_reasons_json, decision_json, created_at_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.DecisionID,
+		rec.RunID,
+		rec.CycleID,
+		rec.SnapshotID,
+		rec.Symbol,
+		rec.Stage,
+		rec.Intent,
+		rec.RiskVerdict,
+		rec.ReasonsJSON,
+		rec.RiskReasonsJSON,
+		rec.AIVerdict,
+		rec.AIReasonsJSON,
+		rec.DecisionJSON,
+		rec.CreatedAtMs,
+	)
+	if err != nil {
+		return fmt.Errorf("insert decision: %w", err)
+	}
+	return nil
+}
+
 type rowScanner interface {
 	Scan(dest ...any) error
 }

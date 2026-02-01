@@ -8,9 +8,33 @@ type RateLimit struct {
 }
 
 type ExchangeInfo struct {
-	Timezone   string      `json:"timezone"`
-	ServerTime int64       `json:"serverTime"`
-	RateLimits []RateLimit `json:"rateLimits"`
+	Timezone   string               `json:"timezone"`
+	ServerTime int64                `json:"serverTime"`
+	RateLimits []RateLimit          `json:"rateLimits"`
+	Symbols    []ExchangeInfoSymbol `json:"symbols"`
+}
+
+type ExchangeInfoSymbol struct {
+	Symbol     string   `json:"symbol"`
+	Status     string   `json:"status"`
+	QuoteAsset string   `json:"quoteAsset"`
+	Filters    []Filter `json:"filters"`
+}
+
+type Filter struct {
+	FilterType          string `json:"filterType"`
+	MinPrice            string `json:"minPrice,omitempty"`
+	MaxPrice            string `json:"maxPrice,omitempty"`
+	TickSize            string `json:"tickSize,omitempty"`
+	MinQty              string `json:"minQty,omitempty"`
+	MaxQty              string `json:"maxQty,omitempty"`
+	StepSize            string `json:"stepSize,omitempty"`
+	MinNotional         string `json:"minNotional,omitempty"`
+	MaxNumOrders        int    `json:"maxNumOrders,omitempty"`
+	MaxNumAlgoOrders    int    `json:"maxNumAlgoOrders,omitempty"`
+	TrailingDeltaMin    int    `json:"minTrailingAboveDelta,omitempty"`
+	TrailingDeltaMax    int    `json:"maxTrailingAboveDelta,omitempty"`
+	TrailingDeltaStep   int    `json:"minTrailingBelowDelta,omitempty"`
 }
 
 type DepthResponse struct {

@@ -1,4 +1,4 @@
-# livespot — AGENTS.md (Codex CLI Operating Contract)
+﻿# livespot â€” AGENTS.md (Codex CLI Operating Contract)
 
 This file defines non-negotiable operating rules for Codex CLI inside this repository.
 It is authoritative for agent workflow, git discipline, validation gates, and stop conditions.
@@ -124,7 +124,7 @@ Codex MUST operate in stages. For each stage:
 
 Prohibited:
 - WIP commits
-- “fix”, “temp”, “update”, “misc” messages
+- â€œfixâ€, â€œtempâ€, â€œupdateâ€, â€œmiscâ€ messages
 - multiple commits per stage
 
 ### 4.3 Amend policy (allowed before push)
@@ -166,41 +166,48 @@ Codex MUST run these commands (and show outputs), adapting stage number and bran
 ---
 
 ## 5) Stage plan (must execute strictly in order)
-Stage 01 — Repo bootstrap + minimal build
+Stage 01 â€” Repo bootstrap + minimal build
 - Create Go module and repository skeleton consistent with `09_CODE_STRUCTURE.md`.
 - Provide minimal `cmd/*` entrypoints.
 - Ensure `go test ./...` and `go vet ./...` PASS.
 
-Stage 02 — Config + strict validation (fail-closed)
+Stage 02 â€” Config + strict validation (fail-closed)
 - Implement config loading and strict validation.
 - Invalid config must stop/PAUSE with explicit reason.
 - Add unit tests for validation.
 
-Stage 03 — Contracts + deterministic hashing
+Stage 03 â€” Contracts + deterministic hashing
 - Implement core structs and validations for:
   - decision, snapshot, audit event, risk verdict, AI gate result (only as specified).
 - Implement deterministic serialization (canonical JSON) and SHA-256 hashing as specified.
 - Add determinism tests.
 
-Stage 04 — Audit sinks (SQLite + JSONL) + correlation IDs
+Stage 04 â€” Audit sinks (SQLite + JSONL) + correlation IDs
 - Implement audit events, correlation identifiers, and sinks.
 - Audit must be required; sink failure must stop/PAUSE.
 - Add tests for write/read (SQLite) and JSONL line validity.
 
-Stage 05 — LIVE locks + redaction
+Stage 05 â€” LIVE locks + redaction
 - Implement strict LIVE safety locks as specified by docs.
 - Implement strict log redaction.
 - Add tests.
 
-Stage 06 — Pipeline skeleton + stages + observability
+Stage 06 â€” Pipeline skeleton + stages + observability
 - Implement stage machine and stage reporting.
 - Provide dry-run mode producing audit events.
 - No real execution/trading unless explicitly specified and unlocked.
 
-Stage 07 — Doctor checks + troubleshooting docs
-- Implement `doctor` command to verify environment and readiness:
+
+Stage 07 - Doctor checks + troubleshooting docs
+- Implement doctor command to verify environment and readiness:
   - config, locks, audit sinks, filesystem permissions, DB availability.
-- Add troubleshooting section to `README.md` (technical English).
+- Add troubleshooting section to README.md (technical English).
+
+Stage 08 - Decision + AI gate (no orders)
+- Implement live data ingestion (REST + WS) for snapshots and selection inputs.
+- Implement decision pipeline with strategy propose, AI gate evaluation, and risk verdict.
+- Persist snapshots and decisions (canonical JSON) without executing orders.
+- Reduce console noise with throttled summaries.
 
 ---
 
@@ -225,6 +232,13 @@ Stage 07 — Doctor checks + troubleshooting docs
 - [ ] Stage completion marker printed: `STAGE XX COMPLETE`
 - [ ] STOP (do not proceed to next stage)
 
+### 6.4 Decision + AI (no orders) checklist
+- [ ] Live startup checks display sqlite migrate, OpenAI call, Binance REST, Binance WS, and USDT balance
+- [ ] Universe scan, ranking, deep scan, and top-k selection run without error
+- [ ] Strategy decision and AI gate evaluation complete (no order placement)
+- [ ] Decisions persisted to SQLite with canonical JSON payload
+- [ ] Summary logging throttled (no per-tick WS spam)
+
 ---
 
 ## 7) Output format (must be used)
@@ -241,3 +255,5 @@ If blocked:
 - Output `MISSING_INFORMATION (BLOCKER)` and STOP.
 
 ---
+
+

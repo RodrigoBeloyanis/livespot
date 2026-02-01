@@ -122,3 +122,38 @@ DECISION: Add ai_gate_timeout_ms=8000, ai_gate_model=gpt-4o-mini, and openai_bas
 MOTIVATION: AI Gate requires deterministic API timeouts/model selection and a single base URL for OpenAI calls.
 IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
 RISKS / MITIGATIONS: If model or base URL changes, update config defaults and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Decision persistence table
+DECISION: Add decisions table with decision_json payloads keyed by decision_id.
+MOTIVATION: Decision pipeline requires audit reconstruction for internal decisions even without order execution; schema was not specified in higher docs.
+IMPACT: migrations/0004_decisions.sql, internal\infra\sqlite\queries.go, internal\app\loop.go
+RISKS / MITIGATIONS: If additional indices or fields are required (run_id/snapshot_id queries), add a new migration and record it here.
+
+DATE: 2026-02-01
+TOPIC: Snapshot ID format for live builds
+DECISION: Use snapshot_id format snap_{SYMBOL}_{exchange_time_ms} and store snapshot_hash separately.
+MOTIVATION: Contracts require a snapshot_id but do not mandate a specific format; snapshot_hash provides deterministic content identity.
+IMPACT: internal\engine\state\live_provider.go
+RISKS / MITIGATIONS: If a hash-based snapshot_id is required later, add a new field or migration to preserve referential integrity.
+
+DATE: 2026-02-01
+TOPIC: Exchange filters hash and constraints mapping
+DECISION: Hash Binance symbol filters and status into filters_hash and derive decision constraints from filter fields.
+MOTIVATION: 02_DATA_SNAPSHOT_SPEC requires filters_hash and decision constraints but does not specify a hashing scheme; using canonical JSON provides determinism.
+IMPACT: internal\infra\binance\filters.go, internal\engine\state\live_provider.go
+RISKS / MITIGATIONS: If the exchange filter schema changes, update the hash input and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Ranking thresholds hash
+DECISION: Hash selection thresholds into thresholds_hash using canonical JSON.
+MOTIVATION: Selection thresholds are part of ranking provenance but lack a defined hash method; canonical JSON keeps consistent hashing.
+IMPACT: internal\engine\selection\thresholds_hash.go, internal\engine\state\live_provider.go
+RISKS / MITIGATIONS: If thresholds expand or need sorting, update the hash schema and log the change.
+
+DATE: 2026-02-01
+TOPIC: Live candidate symbol selection
+DECISION: Select candidate symbols by 24h quote volume over the configured minimum and respect symbol status and filters.
+MOTIVATION: Universe scan requires a deterministic candidate list; no higher-level doc defines a selection rule.
+IMPACT: internal\engine\state\live_provider.go
+RISKS / MITIGATIONS: If a fixed watchlist or different ranking basis is required, update the candidate selection and record the change.

@@ -2,14 +2,29 @@ package app
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/RodrigoBeloyanis/livespot/internal/audit"
 	"github.com/RodrigoBeloyanis/livespot/internal/config"
 	auditdomain "github.com/RodrigoBeloyanis/livespot/internal/domain/audit"
+	"github.com/RodrigoBeloyanis/livespot/internal/domain/hash"
+	"github.com/RodrigoBeloyanis/livespot/internal/domain/contracts"
 	"github.com/RodrigoBeloyanis/livespot/internal/domain/reasoncodes"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/aigate"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/deepscan"
 	"github.com/RodrigoBeloyanis/livespot/internal/engine/health"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/persist"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/rank"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/risk"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/state"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/strategy"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/topk"
+	"github.com/RodrigoBeloyanis/livespot/internal/engine/universe"
+	"github.com/RodrigoBeloyanis/livespot/internal/infra/sqlite"
+	"github.com/RodrigoBeloyanis/livespot/internal/infra/binance"
 	"github.com/RodrigoBeloyanis/livespot/internal/observability"
 )
 
@@ -20,6 +35,12 @@ type Loop struct {
 	now      func() time.Time
 	sysEval  health.Evaluator
 	sysMode  health.SysMode
+	db       *sql.DB
+	provider *state.LiveSnapshotProvider
+	gate     *aigate.Gate
+	selectionStore *persist.SelectionStore
+	prevTopK []string
+	cyclesSincePrev int
 
 	sysModeSince   time.Time
 	sysModeReasons []reasoncodes.ReasonCode
@@ -32,7 +53,7 @@ type Loop struct {
 	forceExit         bool
 }
 
-func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time) (*Loop, error) {
+func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.StageReporter, now func() time.Time, db *sql.DB, provider *state.LiveSnapshotProvider, gate *aigate.Gate) (*Loop, error) {
 	if writer == nil {
 		return nil, fmt.Errorf("audit writer missing")
 	}
@@ -47,6 +68,10 @@ func NewLoop(cfg config.Config, writer *audit.Writer, reporter observability.Sta
 		sysEval:      health.NewEvaluator(cfg),
 		sysMode:      health.SysModeNormal,
 		sysModeSince: now(),
+		db:           db,
+		provider:     provider,
+		gate:         gate,
+		selectionStore: persist.NewSelectionStore(db),
 	}, nil
 }
 
@@ -90,24 +115,174 @@ func (l *Loop) Run(ctx context.Context) error {
 }
 
 func (l *Loop) runCycle(ctx context.Context, runID string, cycleID string) error {
-	for _, stage := range l.stageSequence() {
-		if err := l.refreshSysMode(ctx, runID, cycleID); err != nil {
+	if err := l.refreshSysMode(ctx, runID, cycleID); err != nil {
+		return err
+	}
+	if l.sysMode == health.SysModePause {
+		if err := l.emitStage(runID, cycleID, observability.PAUSE, "", "paused"); err != nil {
 			return err
 		}
-		if l.sysMode == health.SysModePause {
-			if err := l.emitStage(runID, cycleID, observability.PAUSE, "", "paused"); err != nil {
-				return err
-			}
-			if err := sleepCtx(ctx, 500*time.Millisecond); err != nil {
-				return err
-			}
+		if err := sleepCtx(ctx, 500*time.Millisecond); err != nil {
+			return err
+		}
+		return nil
+	}
+	if l.provider == nil || l.db == nil {
+		return fmt.Errorf("loop deps missing")
+	}
+
+	bundles, err := l.provider.BuildSnapshots(ctx, l.now())
+	if err != nil {
+		return err
+	}
+	if err := l.persistSnapshots(ctx, bundles); err != nil {
+		return err
+	}
+
+	snapshotList := make([]state.SnapshotBundle, 0, len(bundles))
+	snapshotsOnly := make([]contracts.Snapshot, 0, len(bundles))
+	for _, bundle := range bundles {
+		snapshotList = append(snapshotList, bundle)
+		snapshotsOnly = append(snapshotsOnly, bundle.Snapshot)
+	}
+
+	if err := l.emitStage(runID, cycleID, observability.BOOT, "", "cycle start"); err != nil {
+		return err
+	}
+
+	universeResults, err := universe.Scan(l.cfg, snapshotsOnly)
+	if err != nil {
+		return err
+	}
+	if err := l.selectionStore.InsertUniverseScans(runID, cycleID, universeResults, l.now()); err != nil {
+		return err
+	}
+	if err := l.emitStage(runID, cycleID, observability.UNIVERSE_SCAN, "", "universe scanned"); err != nil {
+		return err
+	}
+
+	ranked, err := rank.RankTopN(l.cfg, snapshotsOnly, universeResults)
+	if err != nil {
+		return err
+	}
+	if err := l.selectionStore.InsertRankings(runID, cycleID, "TOPN", ranked, l.now()); err != nil {
+		return err
+	}
+	if err := l.emitStage(runID, cycleID, observability.RANK_TOPN, "", "ranked"); err != nil {
+		return err
+	}
+
+	topnSnapshots := filterSnapshotsByRank(snapshotsOnly, ranked)
+	deepResults, err := deepscan.DeepScan(l.cfg, topnSnapshots)
+	if err != nil {
+		return err
+	}
+	if err := l.selectionStore.InsertDeepScan(runID, cycleID, deepResults, l.now()); err != nil {
+		return err
+	}
+	if err := l.emitStage(runID, cycleID, observability.DEEP_SCAN, "", "deep scan"); err != nil {
+		return err
+	}
+
+	selections := make([]topk.Selection, 0, len(deepResults))
+	for _, item := range deepResults {
+		selections = append(selections, topk.Selection{
+			Symbol:      item.Symbol,
+			ScoreX10000: item.ScoreX10000,
+			Features:    item.Features,
+		})
+	}
+	snapMap := map[string]contracts.Snapshot{}
+	for _, s := range snapshotsOnly {
+		snapMap[s.Symbol] = s
+	}
+	result := topk.SelectTopK(l.cfg, selections, snapMap, l.prevTopK, l.cyclesSincePrev)
+	topkSymbols := make([]string, 0, len(result.TopK))
+	for _, sel := range result.TopK {
+		topkSymbols = append(topkSymbols, sel.Symbol)
+	}
+	if err := l.selectionStore.InsertSelection(runID, cycleID, symbolsFromRank(ranked), topkSymbols, topkSymbols, result.ChurnGuardApplied, len(result.PairsOverLimit) > 0, result.MaxPairwiseCorr, result.PairsOverLimit, rankedConfigHash(ranked), l.now()); err != nil {
+		return err
+	}
+	if err := l.emitStage(runID, cycleID, observability.WATCHLIST_ATTACH, "", "watchlist"); err != nil {
+		return err
+	}
+	l.prevTopK = topkSymbols
+	l.cyclesSincePrev++
+
+	for _, sym := range topkSymbols {
+		bundle, ok := findBundle(snapshotList, sym)
+		if !ok {
 			continue
 		}
-		summary := "not implemented"
-		if l.sysMode == health.SysModeDegrade {
-			summary = "degraded: entries blocked"
+		decision, err := strategy.ProposeEntry(l.cfg, bundle.Snapshot, bundle.Constraints, cycleID, l.now())
+		if err != nil {
+			continue
 		}
-		if err := l.emitStage(runID, cycleID, stage, "", summary); err != nil {
+		if err := l.emitStage(runID, cycleID, observability.STRATEGY_PROPOSE, sym, "decision"); err != nil {
+			return err
+		}
+		decisionID, err := decision.Hash(bundle.Snapshot.Metadata.SnapshotHash)
+		if err != nil {
+			return err
+		}
+		decision.DecisionID = "dec_" + decisionID
+
+		var aiResult contracts.AIGateResult
+		var applied *contracts.Decision
+		if l.cfg.AiDec > 0 && l.gate != nil {
+			aiResult, applied, err = l.gate.Evaluate(ctx, aigate.CallContext{
+				RunID:          runID,
+				CycleID:        cycleID,
+				ExchangeTimeMs: bundle.Snapshot.Metadata.ExchangeTimeMs,
+			}, decision, bundle.Snapshot)
+			if err != nil && l.cfg.AiDec == 2 {
+				return err
+			}
+			if applied != nil {
+				decision = *applied
+			}
+			decision.AIGate = &aiResult
+		}
+
+		freeBalance, lockedBalance := l.accountBalances()
+		riskInput := risk.Input{
+			NowMs:             l.now().UnixMilli(),
+			Snapshot:          bundle.Snapshot,
+			Decision:          decision,
+			ExposureSymbolUSDT: "0.00",
+			ExposureTotalUSDT:  "0.00",
+			OpenOrdersSymbol:   0,
+			OpenOrdersTotal:    0,
+			TradesToday:        0,
+			TradesWindowCount:  0,
+			CooldownUntilMs:    0,
+			ConsecutiveLosses:  0,
+			WSLatencyMs:        0,
+			HasOpenPosition:    false,
+			HasPendingEntry:    false,
+			HasPendingOCO:      false,
+			RealizedPnLUSDT:    "0.00",
+			UnrealizedPnLUSDT:  "0.00",
+			EquityPeakUSDT:     "0.00",
+			EquityStartUSDT:    "0.00",
+			FreeBalanceUSDT:    freeBalance,
+			LockedBalanceUSDT:  lockedBalance,
+			PendingReserveUSDT: "0.00",
+			UnfilledOrderCountPct: 0,
+			CancelReplaceCount10s: 0,
+			CancelCount10s:        0,
+			NewOrdersCount10s:     0,
+		}
+		verdict, err := risk.Evaluate(l.cfg, riskInput)
+		if err != nil {
+			return err
+		}
+		decision.RiskVerdict = &verdict
+		if err := l.emitStage(runID, cycleID, observability.RISK_VERDICT, sym, string(verdict.Verdict)); err != nil {
+			return err
+		}
+		if err := l.persistDecision(ctx, runID, cycleID, decision); err != nil {
 			return err
 		}
 	}
@@ -325,4 +500,127 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func (l *Loop) persistSnapshots(ctx context.Context, bundles []state.SnapshotBundle) error {
+	for _, bundle := range bundles {
+		snapshotJSON, err := hash.CanonicalJSON(bundle.Snapshot)
+		if err != nil {
+			return err
+		}
+		rec := sqlite.SnapshotRecord{
+			SnapshotID:     bundle.Snapshot.Metadata.SnapshotID,
+			Symbol:         bundle.Snapshot.Symbol,
+			SnapshotHash:   bundle.Snapshot.Metadata.SnapshotHash,
+			ExchangeTimeMs: bundle.Snapshot.Metadata.ExchangeTimeMs,
+			LocalReceivedMs: bundle.Snapshot.Metadata.LocalReceivedMs,
+			SnapshotJSON:   string(snapshotJSON),
+			CreatedAtMs:    bundle.Snapshot.Metadata.LocalReceivedMs,
+		}
+		if err := sqlite.InsertSnapshot(ctx, l.db, rec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *Loop) persistDecision(ctx context.Context, runID string, cycleID string, decision contracts.Decision) error {
+	reasons, err := json.Marshal(decision.Reasons)
+	if err != nil {
+		return err
+	}
+	riskReasons := []reasoncodes.ReasonCode{}
+	riskVerdict := ""
+	if decision.RiskVerdict != nil {
+		riskReasons = decision.RiskVerdict.Reasons
+		riskVerdict = string(decision.RiskVerdict.Verdict)
+	}
+	riskReasonsJSON, err := json.Marshal(riskReasons)
+	if err != nil {
+		return err
+	}
+	aiVerdict := ""
+	aiReasons := []reasoncodes.ReasonCode{}
+	if decision.AIGate != nil {
+		aiVerdict = string(decision.AIGate.Verdict)
+		aiReasons = decision.AIGate.Reasons
+	}
+	aiReasonsJSON, err := json.Marshal(aiReasons)
+	if err != nil {
+		return err
+	}
+	decisionJSON, err := hash.CanonicalJSON(decision)
+	if err != nil {
+		return err
+	}
+	rec := sqlite.DecisionRecord{
+		DecisionID:      decision.DecisionID,
+		RunID:           runID,
+		CycleID:         cycleID,
+		SnapshotID:      decision.SnapshotID,
+		Symbol:          decision.Symbol,
+		Stage:           string(decision.Stage),
+		Intent:          string(decision.Intent),
+		RiskVerdict:     riskVerdict,
+		ReasonsJSON:     string(reasons),
+		RiskReasonsJSON: string(riskReasonsJSON),
+		AIVerdict:       aiVerdict,
+		AIReasonsJSON:   string(aiReasonsJSON),
+		DecisionJSON:    string(decisionJSON),
+		CreatedAtMs:     decision.TsMs,
+	}
+	return sqlite.InsertDecision(ctx, l.db, rec)
+}
+
+func findBundle(bundles []state.SnapshotBundle, symbol string) (state.SnapshotBundle, bool) {
+	for _, bundle := range bundles {
+		if bundle.Snapshot.Symbol == symbol {
+			return bundle, true
+		}
+	}
+	return state.SnapshotBundle{}, false
+}
+
+func filterSnapshotsByRank(snapshots []contracts.Snapshot, ranked []rank.RankedSymbol) []contracts.Snapshot {
+	index := map[string]contracts.Snapshot{}
+	for _, snap := range snapshots {
+		index[snap.Symbol] = snap
+	}
+	out := make([]contracts.Snapshot, 0, len(ranked))
+	for _, item := range ranked {
+		if snap, ok := index[item.Symbol]; ok {
+			out = append(out, snap)
+		}
+	}
+	return out
+}
+
+func symbolsFromRank(ranked []rank.RankedSymbol) []string {
+	out := make([]string, 0, len(ranked))
+	for _, item := range ranked {
+		out = append(out, item.Symbol)
+	}
+	return out
+}
+
+func rankedConfigHash(ranked []rank.RankedSymbol) string {
+	if len(ranked) == 0 {
+		return ""
+	}
+	return ranked[0].ConfigHash
+}
+
+func (l *Loop) accountBalances() (string, string) {
+	if l.provider == nil {
+		return "0.00", "0.00"
+	}
+	info, _, ok := l.provider.AccountInfo()
+	if !ok {
+		return "0.00", "0.00"
+	}
+	balance, ok := binance.FindBalance(info, "USDT")
+	if !ok {
+		return "0.00", "0.00"
+	}
+	return balance.Free, balance.Locked
 }
