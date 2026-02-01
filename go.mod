@@ -2,7 +2,10 @@ module github.com/RodrigoBeloyanis/livespot
 
 go 1.25.6
 
-require github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
+require (
+	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
+	modernc.org/sqlite v1.44.3
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -15,5 +18,4 @@ require (
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.44.3 // indirect
 )
