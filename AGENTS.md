@@ -210,13 +210,17 @@ Stage 08 - Decision + AI gate (no orders)
 - Reduce console noise with throttled summaries.
 
 Stage 09 - Startup checks visibility
+- Log startup checks for sqlite migrate, OpenAI connectivity, Binance REST/WS, and USDT balance.
+- Seed initial REST/WS liveness timestamps to prevent immediate stale pauses.
+
 Stage 10 - Rate limit mitigation
 - Add REST caching for tickers, klines, and account info to reduce Binance weight usage.
 - Prefer cached data when fresh and fall back to last good data within a bounded window.
 
-
-- Log startup checks for sqlite migrate, OpenAI connectivity, Binance REST/WS, and USDT balance.
-- Seed initial REST/WS liveness timestamps to prevent immediate stale pauses.
+Stage 11 - Execution core (intents + quantization)
+- Wire order intent ledger into execution flow (create, confirm, sent-unknown).
+- Enforce quantization and filter validation before any submit/cancel/replace.
+- Add REST adapter for Binance order submission and clientOrderId lookup.
 
 
 ---
@@ -267,7 +271,6 @@ If blocked:
 - Output `MISSING_INFORMATION (BLOCKER)` and STOP.
 
 ---
-
 
 
 

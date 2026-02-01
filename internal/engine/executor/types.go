@@ -41,6 +41,9 @@ type CancelReplaceRequest struct {
 	NewClientID   string
 	NewPrice      string
 	NewQty        string
+	Side          contracts.Side
+	Type          OrderType
+	TimeInForce   contracts.TimeInForce
 }
 
 type PriceFilter struct {
