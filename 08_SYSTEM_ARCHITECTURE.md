@@ -47,6 +47,41 @@ COMPONENTS (BOX VIEW)
 - Audit/Observability: persists SQLite + JSONL + logs with correlation.
 - Local alerting: mandatory alerting (highlighted console + panel toast + optional sound) on critical events; always generates AuditEventType=ALERT_RAISED and the corresponding reason_code.
 
+E2E MOCK INTERFACE (STAGE 20 REQUIREMENT)
+Goal:
+- define the minimum interfaces required to run end-to-end tests with a mocked exchange.
+- make Stage 20 deterministic and non-networked.
+
+Interfaces (Go-style, minimal):
+
+ExchangeClient (mockable):
+ - Time(ctx) (server_time_ms int64, err error)
+ - ExchangeInfo(ctx) (filters_json []byte, err error)
+ - Depth(ctx, symbol string, limit int) (depth_json []byte, err error)
+ - NewOrder(ctx, req OrderRequest) (OrderResponse, err error)
+ - QueryOrder(ctx, symbol string, clientOrderId string) (OrderResponse, err error)
+ - CancelOrder(ctx, symbol string, clientOrderId string) (OrderResponse, err error)
+ - CancelReplace(ctx, req CancelReplaceRequest) (OrderResponse, err error)
+ - OpenOrders(ctx, symbol string) ([]OrderResponse, err error)
+ - AllOrders(ctx, symbol string, limit int) ([]OrderResponse, err error)
+ - Account(ctx) (balances_json []byte, err error)
+
+Pipeline (test harness):
+ - RunOnce(ctx, input PipelineInput) (PipelineResult, err error)
+ - RunSoakTick(ctx, input PipelineInput) (PipelineResult, err error)
+
+PipelineInput (minimum for tests):
+ - run_id, cycle_id, mode
+ - snapshot + snapshot_hash
+ - decision + decision_id
+ - mock exchange client (ExchangeClient)
+ - deterministic clock (time source)
+
+Loop trigger for E2E tests:
+- test harness calls RunOnce for a single cycle.
+- soak harness calls RunSoakTick in a loop with entries disabled.
+- no network calls are allowed in these tests; all external data is provided by the mock ExchangeClient.
+
 SYSTEM STATE MODES
 - NORMAL: full pipeline (scans + entries + management).
 - DEGRADE: blocks new entries, keeps management/reconcile/auditing.

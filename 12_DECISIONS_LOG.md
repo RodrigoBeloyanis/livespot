@@ -110,6 +110,11 @@ DECISION: Implement drawdown limits in USDT (max_drawdown_usdt) to align with Ri
 MOTIVATION: 01_DECISION_CONTRACT.md defines MaxDrawdownUSDT, which is higher authority than 04_RISK_ENGINE_RULES.md; preserving contract avoids schema change in Stage 14.
 IMPACT: internal\\engine\\risk\\engine.go, internal\\config\\config.go, 00_SOURCE_OF_TRUTH.md
 RISKS / MITIGATIONS: If percentage drawdown is required later, add a new field with a formal contract update and migration; keep USDT field for backward compatibility.
+TOPIC: Soak mode and readiness report
+DECISION: Add offline soak mode with mocked exchange and a deterministic readiness report (config_validated, audit_writer_ok, soak_pass).
+MOTIVATION: Stage 20 requires a long soak that validates liveness/health signals without network calls and a deterministic readiness summary.
+IMPACT: cmd\soak\main.go, internal\e2e\*, README.md, 10_OPERATIONS_RULES.md, 09_CODE_STRUCTURE.md
+RISKS / MITIGATIONS: Soak uses synthetic fixtures and cannot validate live exchange behavior; keep Live checklist and real audits mandatory for production.
 
 DATE: 2026-02-01
 TOPIC: AI Gate defaults
@@ -117,10 +122,3 @@ DECISION: Add ai_gate_timeout_ms=8000, ai_gate_model=gpt-4o-mini, and openai_bas
 MOTIVATION: AI Gate requires deterministic API timeouts/model selection and a single base URL for OpenAI calls.
 IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
 RISKS / MITIGATIONS: If model or base URL changes, update config defaults and record the change here.
-
-DATE: 2026-02-01
-TOPIC: Soak mode and readiness report
-DECISION: Add offline soak mode with mocked exchange and a deterministic readiness report (config_validated, audit_writer_ok, soak_pass).
-MOTIVATION: Stage 20 requires a long soak that validates liveness/health signals without network calls and a deterministic readiness summary.
-IMPACT: cmd\soak\main.go, internal\e2e\*, README.md, 10_OPERATIONS_RULES.md, 09_CODE_STRUCTURE.md
-RISKS / MITIGATIONS: Soak uses synthetic fixtures and cannot validate live exchange behavior; keep Live checklist and real audits mandatory for production.
