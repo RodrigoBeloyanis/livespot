@@ -25,3 +25,10 @@ MOTIVATION: Stage 02 requires strict config validation and 07_SECURITY mandates 
 IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
 RISKS / MITIGATIONS: If the redacted JSON limit is too small or the LIVE.ok policy changes, adjust defaults and revalidate with a logged decision.
 
+DATE: 2026-02-01
+TOPIC: Audit sink defaults and correlation identifiers
+DECISION: Add audit_sqlite_path=var/data/audit.sqlite, audit_jsonl_dir=var/logs, and audit_sqlite_busy_timeout_ms=5000; define correlation IDs using fixed prefixes and snapshot/decision/order_intent IDs derived from SHA-256 hashes, and run_id/cycle_id formatted as run_YYYYMMDD_HHMMSS / cyc_YYYYMMDD_HHMMSS.
+MOTIVATION: Stage 04 requires SQLite+JSONL sinks and correlation identifiers; defaults are necessary for deterministic, fail-closed initialization.
+IMPACT: internal\config\config.go, internal\config\validate.go, internal\audit\*.go, internal\infra\sqlite\*.go, internal\observability\correlation.go, 00_SOURCE_OF_TRUTH.md, migrations\0001_init.sql.
+RISKS / MITIGATIONS: If ID formats or paths must change, update 00_SOURCE_OF_TRUTH.md and record the decision; ensure readers accept prefix+hash IDs.
+

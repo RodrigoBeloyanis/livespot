@@ -107,6 +107,15 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePositiveInt("audit_redacted_json_max_bytes", cfg.AuditRedactedJSONMaxBytes); err != nil {
 		return err
 	}
+	if cfg.AuditSQLitePath == "" {
+		return ValidationError{Field: "audit_sqlite_path", Message: "missing"}
+	}
+	if cfg.AuditJSONLDir == "" {
+		return ValidationError{Field: "audit_jsonl_dir", Message: "missing"}
+	}
+	if err := requirePositiveInt("audit_sqlite_busy_timeout_ms", cfg.AuditSQLiteBusyTimeoutMs); err != nil {
+		return err
+	}
 	return nil
 }
 

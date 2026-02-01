@@ -31,6 +31,9 @@ type Config struct {
 	ClockDriftMaxMsPaper          int
 	DiskHealthSampleIntervalMs    int
 	AuditRedactedJSONMaxBytes     int
+	AuditSQLitePath               string
+	AuditJSONLDir                 string
+	AuditSQLiteBusyTimeoutMs      int
 }
 
 func Default() Config {
@@ -61,6 +64,9 @@ func Default() Config {
 		ClockDriftMaxMsPaper:          2000,
 		DiskHealthSampleIntervalMs:    5000,
 		AuditRedactedJSONMaxBytes:     4096,
+		AuditSQLitePath:               "var/data/audit.sqlite",
+		AuditJSONLDir:                 "var/logs",
+		AuditSQLiteBusyTimeoutMs:      5000,
 	}
 }
 

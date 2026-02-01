@@ -37,3 +37,11 @@ func TestValidateLiveOKFileMissing(t *testing.T) {
 		t.Fatalf("expected error for missing live ok file")
 	}
 }
+
+func TestValidateAuditPathsMissing(t *testing.T) {
+	cfg := Default()
+	cfg.AuditSQLitePath = ""
+	if err := Validate(cfg, os.Stat); err == nil {
+		t.Fatalf("expected error for missing audit_sqlite_path")
+	}
+}
