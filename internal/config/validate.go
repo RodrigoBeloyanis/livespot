@@ -71,6 +71,9 @@ func Validate(cfg Config, stat StatFunc) error {
 	if err := requirePct("audit_writer_queue_full_pct", cfg.AuditWriterQueueFull); err != nil {
 		return err
 	}
+	if err := requirePositiveInt("audit_writer_queue_capacity", cfg.AuditWriterQueueCapacity); err != nil {
+		return err
+	}
 	if err := requirePositiveInt("audit_writer_max_lag_ms", cfg.AuditWriterMaxLagMs); err != nil {
 		return err
 	}
