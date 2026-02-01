@@ -27,4 +27,23 @@ func TestRunAllReturnsResults(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatalf("expected results")
 	}
+	required := map[string]bool{
+		"config_validate": false,
+		"mode":            false,
+		"ai_dec":          false,
+		"live_ok_file":    false,
+		"data_dir":        false,
+		"audit_sqlite":    false,
+		"audit_jsonl":     false,
+	}
+	for _, result := range results {
+		if _, ok := required[result.Name]; ok {
+			required[result.Name] = true
+		}
+	}
+	for name, seen := range required {
+		if !seen {
+			t.Fatalf("missing check result: %s", name)
+		}
+	}
 }

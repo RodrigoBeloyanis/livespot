@@ -32,13 +32,22 @@ func RunAll(r Runner) []CheckResult {
 		r.Stat = os.Stat
 	}
 	results := []CheckResult{
+		checkConfig(r.Cfg, r.Stat),
 		checkMode(r.Cfg),
 		checkAiDec(r.Cfg),
 		checkLiveOKFile(r.Cfg, r.Stat),
+		checkDataDirWritable(r.Now),
 		checkSQLite(r.Cfg, r.Now),
 		checkJSONLWritable(r.Now),
 	}
 	return results
+}
+
+func checkConfig(cfg config.Config, stat func(string) (fs.FileInfo, error)) CheckResult {
+	if err := config.Validate(cfg, stat); err != nil {
+		return CheckResult{Name: "config_validate", OK: false, Details: err.Error()}
+	}
+	return CheckResult{Name: "config_validate", OK: true, Details: "ok"}
 }
 
 func checkMode(cfg config.Config) CheckResult {
@@ -78,6 +87,28 @@ func checkSQLite(cfg config.Config, now func() time.Time) CheckResult {
 		return CheckResult{Name: "audit_sqlite", OK: false, Details: err.Error()}
 	}
 	return CheckResult{Name: "audit_sqlite", OK: true, Details: audit.DefaultSQLitePath}
+}
+
+func checkDataDirWritable(now func() time.Time) CheckResult {
+	path := filepath.Dir(audit.DefaultSQLitePath)
+	if err := os.MkdirAll(path, 0o750); err != nil {
+		return CheckResult{Name: "data_dir", OK: false, Details: err.Error()}
+	}
+	temp := filepath.Join(path, fmt.Sprintf("doctor-data-%d.tmp", now().UnixNano()))
+	file, err := os.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return CheckResult{Name: "data_dir", OK: false, Details: err.Error()}
+	}
+	_, writeErr := file.WriteString("ok\n")
+	closeErr := file.Close()
+	_ = os.Remove(temp)
+	if writeErr != nil {
+		return CheckResult{Name: "data_dir", OK: false, Details: writeErr.Error()}
+	}
+	if closeErr != nil {
+		return CheckResult{Name: "data_dir", OK: false, Details: closeErr.Error()}
+	}
+	return CheckResult{Name: "data_dir", OK: true, Details: path}
 }
 
 func checkJSONLWritable(now func() time.Time) CheckResult {

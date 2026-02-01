@@ -218,6 +218,12 @@ Doctor checks
 - Run go run .\\cmd\\doctor to verify config, LIVE locks, audit sinks, filesystem permissions, and SQLite availability.
 - Any FAIL means the system must remain in PAUSE or DEGRADE until resolved.
 
+Doctor FAIL handling (deterministic)
+- If config_validate FAIL: fix config values and re-run doctor; do not start LIVE.
+- If live_ok_file FAIL: create var\\LIVE.ok (when required) and re-run doctor.
+- If data_dir or audit_jsonl FAIL: fix filesystem permissions for var\\data and var\\logs.
+- If audit_sqlite FAIL: fix disk space or file permissions; do not operate without audit.
+
 1) Symptom: SYS MODE stuck in DEGRADE or PAUSE
 - Detect:
   - Web panel header: SYS MODE=DEGRADE|PAUSE and active reason_codes
