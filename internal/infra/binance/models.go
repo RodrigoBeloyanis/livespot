@@ -8,9 +8,16 @@ type RateLimit struct {
 }
 
 type ExchangeInfo struct {
-	Timezone   string      `json:"timezone"`
-	ServerTime int64       `json:"serverTime"`
-	RateLimits []RateLimit `json:"rateLimits"`
+	Timezone   string               `json:"timezone"`
+	ServerTime int64                `json:"serverTime"`
+	RateLimits []RateLimit          `json:"rateLimits"`
+	Symbols    []ExchangeInfoSymbol `json:"symbols"`
+}
+
+type ExchangeInfoSymbol struct {
+	Symbol     string `json:"symbol"`
+	Status     string `json:"status"`
+	QuoteAsset string `json:"quoteAsset"`
 }
 
 type DepthResponse struct {

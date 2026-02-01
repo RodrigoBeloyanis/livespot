@@ -122,3 +122,10 @@ DECISION: Add ai_gate_timeout_ms=8000, ai_gate_model=gpt-4o-mini, and openai_bas
 MOTIVATION: AI Gate requires deterministic API timeouts/model selection and a single base URL for OpenAI calls.
 IMPACT: internal\config\config.go, internal\config\validate.go, 00_SOURCE_OF_TRUTH.md
 RISKS / MITIGATIONS: If model or base URL changes, update config defaults and record the change here.
+
+DATE: 2026-02-01
+TOPIC: Startup connectivity checks and liveness feeds
+DECISION: Add startup checks for SQLite migration, OpenAI ChatCompletion, Binance REST/WS connectivity, and USDT balance; start WS/REST heartbeats to populate liveness signals.
+MOTIVATION: Live boot needs visible health checks and non-zero WS/REST liveness signals to avoid immediate stale pauses.
+IMPACT: cmd\livespot\main.go, internal\app\startup_checks.go, internal\app\live_feeds.go, internal\infra\binance\models.go, internal\infra\binance\account.go, internal\infra\binance\exchangeinfo_select.go, internal\infra\binance\account_test.go, internal\infra\binance\exchangeinfo_select_test.go
+RISKS / MITIGATIONS: Startup checks use real network calls and can fail on transient outages; fail-closed is expected in Live and timeouts are bounded.
